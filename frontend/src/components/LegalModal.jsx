@@ -103,3 +103,4 @@ export default function LegalModal({ isOpen, onClose, page = 'about' }) {
     </div>
   );
 }
+

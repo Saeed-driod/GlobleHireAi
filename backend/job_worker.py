@@ -87,12 +87,48 @@ def clean_html_description(raw_html: str) -> str:
     except Exception:
         return re.sub(r"<[^>]+>", " ", raw_html).strip()[:10000]
 
+BAD_TAG_PATTERNS = [
+    r"high\s*school",
+    r"equivalent",
+    r"diploma",
+    r"bachelor",
+    r"master",
+    r"degree",
+    r"education",
+    r"ged\b",
+    r"entry\s*level",
+    r"mid\s*level",
+    r"senior\s*level",
+    r"full\s*time",
+    r"part\s*time",
+    r"contract\b"
+]
+
+def is_german_or_non_english(title: str, desc: str) -> bool:
+    """Detect non-English or German job postings."""
+    combined = f"{title} {desc}".lower()
+    if any(marker in title.lower() for marker in ['(m/w/d)', '(w/m/d)', '(m/w/x)', '(d/m/w)', 'mwd', 'wmd']):
+        return True
+    german_keywords = [
+        ' wir ', ' und ', ' für ', ' mit ', ' dich ', ' uns ', ' bewerbung ',
+        ' über uns ', ' du bringst ', ' deine aufgaben ', ' dein profil ',
+        ' anforderungen ', ' unternehmen ', ' erfahrung ', ' m/w/d ', ' w/m/d ',
+        ' standort ', ' karriere ', ' vollzeit ', ' teilzeit ', ' weiterbildung '
+    ]
+    count = sum(1 for kw in german_keywords if kw in combined)
+    return count >= 2
+
 def extract_tags(text: str, existing_tags: list = None) -> list:
     tags = set()
     if existing_tags:
         for t in existing_tags:
             if isinstance(t, str) and len(t.strip()) > 1:
-                tags.add(t.strip())
+                t_clean = t.strip()
+                t_low = t_clean.lower()
+                # Skip education or employment level noise
+                if any(re.search(pat, t_low) for pat in BAD_TAG_PATTERNS):
+                    continue
+                tags.add(t_clean)
 
     text_lower = f" {text.lower()} "
     for skill in POPULAR_SKILLS:
@@ -209,14 +245,25 @@ def fetch_arbeitnow() -> tuple:
                 continue
 
             desc = clean_html_description(item.get("description", ""))
+            # STEP 1 requirement: Skip jobs whose description is not in English
+            if is_german_or_non_english(title, desc):
+                continue
+
+            is_remote = bool(item.get("remote", False))
+            loc_raw = item.get("location") or ""
+            loc_lower = loc_raw.lower()
+
+            # Skip German on-site job locations (Berlin, Munich, Dresden, etc.)
+            if any(city in loc_lower for city in ['berlin', 'munich', 'münchen', 'dresden', 'frankfurt', 'hamburg', 'köln', 'cologne', 'stuttgart']):
+                if not is_remote and 'remote' not in loc_lower and 'worldwide' not in loc_lower:
+                    continue
+
             tags = extract_tags(f"{title} {desc}", item.get("tags", []))
             cat = normalize_category("", title)
 
-            is_remote = item.get("remote", False)
             job_types = item.get("job_types", [])
             job_type_str = "Remote" if is_remote else ("Hybrid" if "hybrid" in str(job_types).lower() else "On-site")
-
-            location = item.get("location") or ("Remote" if is_remote else "Global")
+            location = loc_raw or ("Worldwide Remote" if is_remote else "Global")
             
             job_obj = {
                 "title": title,

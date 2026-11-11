@@ -39,6 +39,7 @@ export default function App() {
   const [openToPakistan, setOpenToPakistan] = useState(false);
   const [visaSponsored, setVisaSponsored] = useState(false);
   const [hideExpired, setHideExpired] = useState(false);
+  const [includeOnsite, setIncludeOnsite] = useState(false);
   const [viewSavedOnly, setViewSavedOnly] = useState(false);
 
   // Saved / Bookmarked Jobs
@@ -151,7 +152,8 @@ export default function App() {
         q: searchQuery,
         category: category !== 'All' ? category : '',
         job_type: jobType !== 'All' ? jobType : '',
-        sort
+        sort,
+        include_onsite: includeOnsite
       });
       setJobs(data.jobs || []);
       setTotal(data.total || 0);
@@ -168,7 +170,7 @@ export default function App() {
       loadJobs();
     }, 250);
     return () => clearTimeout(timer);
-  }, [searchQuery, category, jobType, sort, page]);
+  }, [searchQuery, category, jobType, sort, page, includeOnsite]);
 
   // Client-side Filter refinement
   const filteredJobs = jobs.filter((job) => {
@@ -219,6 +221,13 @@ export default function App() {
       if (salaryFilter === '$150k+' && val < 150) return false;
       if (salaryFilter === '$100k+' && val < 100) return false;
       if (salaryFilter === '$50k+' && val < 50) return false;
+    }
+
+    // 7. On-site Jobs Filter (Hidden by default unless includeOnsite is toggled ON)
+    if (!includeOnsite) {
+      const jt = (job.job_type || '').toLowerCase();
+      if (jt === 'on-site' || jt === 'onsite') return false;
+      if (job.title && (job.title.includes('(m/w/d)') || job.title.includes('(w/m/d)') || job.title.includes('(m/w/x)'))) return false;
     }
 
     return true;
@@ -430,6 +439,22 @@ export default function App() {
               }`}
             >
               Hide Expired
+            </button>
+
+            {/* Include On-site Jobs Toggle (Off by default) */}
+            <button
+              onClick={() => {
+                setIncludeOnsite(prev => !prev);
+                setPage(1);
+              }}
+              aria-label="Toggle inclusion of on-site jobs"
+              className={`px-3 py-1.5 rounded-2xl font-semibold transition-all ${
+                includeOnsite
+                  ? 'bg-[#0A241B] dark:bg-[#00DF81] text-[#00DF81] dark:text-[#0A241B] font-bold'
+                  : 'bg-[#F4F6F2] dark:bg-white/5 text-[#57685E] dark:text-slate-300'
+              }`}
+            >
+              Include on-site jobs
             </button>
 
             {/* Job Type Toggle */}

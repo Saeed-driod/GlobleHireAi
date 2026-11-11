@@ -122,19 +122,64 @@ def init_db():
             pass
     conn.close()
 
+BAD_TAG_PATTERNS = [
+    r"high\s*school",
+    r"equivalent",
+    r"diploma",
+    r"bachelor",
+    r"master",
+    r"degree",
+    r"education",
+    r"ged\b",
+    r"entry\s*level",
+    r"mid\s*level",
+    r"senior\s*level",
+    r"full\s*time",
+    r"part\s*time",
+    r"contract\b"
+]
+
+def is_german_or_non_english(title: str, desc: str) -> bool:
+    """Detect non-English or German job postings."""
+    combined = f"{title} {desc}".lower()
+    if any(marker in title.lower() for marker in ['(m/w/d)', '(w/m/d)', '(m/w/x)', '(d/m/w)', 'mwd', 'wmd']):
+        return True
+    german_keywords = [
+        ' wir ', ' und ', ' für ', ' mit ', ' dich ', ' uns ', ' bewerbung ',
+        ' über uns ', ' du bringst ', ' deine aufgaben ', ' dein profil ',
+        ' anforderungen ', ' unternehmen ', ' erfahrung ', ' m/w/d ', ' w/m/d ',
+        ' standort ', ' karriere ', ' vollzeit ', ' teilzeit ', ' weiterbildung '
+    ]
+    count = sum(1 for kw in german_keywords if kw in combined)
+    return count >= 2
+
 def clean_tags(tags) -> str:
+    raw_list = []
     if isinstance(tags, list):
-        clean = [str(t).strip() for t in tags if str(t).strip()]
-        return json.dumps(clean[:10])
+        raw_list = tags
     elif isinstance(tags, str):
         try:
             parsed = json.loads(tags)
             if isinstance(parsed, list):
-                return json.dumps([str(t).strip() for t in parsed if str(t).strip()][:10])
+                raw_list = parsed
+            else:
+                raw_list = [tags]
         except Exception:
-            parts = [t.strip() for t in tags.split(",") if t.strip()]
-            return json.dumps(parts[:10])
-    return json.dumps([])
+            raw_list = tags.split(",")
+    
+    clean = []
+    import re
+    for t in raw_list:
+        t_str = str(t).strip()
+        t_lower = t_str.lower()
+        if not t_str or len(t_str) < 2 or len(t_str) > 35:
+            continue
+        # Filter out education levels and generic employment type noise
+        if any(re.search(pat, t_lower) for pat in BAD_TAG_PATTERNS):
+            continue
+        if t_str not in clean:
+            clean.append(t_str)
+    return json.dumps(clean[:10])
 
 def upsert_job(job_data: Dict[str, Any]) -> str:
     """Insert or update job. Returns 'added', 'updated', or 'skipped'."""
@@ -147,6 +192,11 @@ def upsert_job(job_data: Dict[str, Any]) -> str:
         title = str(job_data.get("title", "")).strip()
         company_name = str(job_data.get("company_name", "")).strip()
         if not title or not company_name:
+            return "skipped"
+
+        description = str(job_data.get("description", "")).strip()
+        # Skip jobs whose text is German or non-English
+        if is_german_or_non_english(title, description):
             return "skipped"
 
         tags_json = clean_tags(job_data.get("tags", []))
@@ -201,7 +251,7 @@ def upsert_job(job_data: Dict[str, Any]) -> str:
                 job_data.get("job_type") or "Remote",
                 job_data.get("category") or "Software Dev",
                 job_data.get("salary_range"),
-                job_data.get("description") or "No description provided.",
+                description or "No description provided.",
                 job_data.get("requirements"),
                 apply_url,
                 job_data.get("source_api") or "Manual",
@@ -227,13 +277,32 @@ def get_jobs(
     job_type: Optional[str] = None,
     country: Optional[str] = None,
     featured: Optional[bool] = None,
-    sort: str = "latest"
+    sort: str = "latest",
+    include_onsite: bool = False
 ) -> Dict[str, Any]:
     conn = get_db()
     cursor = conn.cursor()
 
     conditions = []
     params: List[Any] = []
+
+    # 1. By default, ONLY show verified Remote jobs unless "include_onsite" is explicitly enabled
+    if not include_onsite:
+        if not job_type or job_type.lower() == "all" or job_type.lower() == "remote":
+            conditions.append("""(
+                (LOWER(job_type) = 'remote' OR LOWER(location) LIKE '%remote%' OR LOWER(location) LIKE '%worldwide%' OR LOWER(location) LIKE '%anywhere%')
+                AND LOWER(job_type) NOT IN ('on-site', 'onsite')
+                AND LOWER(location) NOT LIKE '%berlin%'
+                AND LOWER(location) NOT LIKE '%munich%'
+                AND LOWER(location) NOT LIKE '%münchen%'
+                AND LOWER(location) NOT LIKE '%dresden%'
+            )""")
+    elif job_type and job_type.strip() and job_type.lower() != "all":
+        conditions.append("LOWER(job_type) LIKE ?")
+        params.append(f"%{job_type.strip().lower()}%")
+
+    # Exclude non-English job markers
+    conditions.append("title NOT LIKE '%(m/w/d)%' AND title NOT LIKE '%(w/m/d)%' AND title NOT LIKE '%(m/w/x)%'")
 
     if q and q.strip():
         search = f"%{q.strip().lower()}%"
@@ -250,9 +319,8 @@ def get_jobs(
         conditions.append("LOWER(category) = LOWER(?)")
         params.append(category.strip())
 
-    if job_type and job_type.strip() and job_type.lower() != "all":
-        conditions.append("LOWER(job_type) LIKE ?")
-        params.append(f"%{job_type.strip().lower()}%")
+    if include_onsite and job_type and job_type.strip() and job_type.lower() != "all":
+        pass # already handled above
 
     if country and country.strip() and country.lower() != "all":
         conditions.append("(LOWER(country) = LOWER(?) OR LOWER(location) LIKE ?)")

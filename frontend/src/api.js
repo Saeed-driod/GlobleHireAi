@@ -11,7 +11,8 @@ export async function fetchJobs({
   job_type = '',
   country = '',
   featured = null,
-  sort = 'latest'
+  sort = 'latest',
+  include_onsite = false
 } = {}) {
   const params = new URLSearchParams();
   params.set('page', page);
@@ -22,6 +23,7 @@ export async function fetchJobs({
   if (country && country !== 'All') params.set('country', country);
   if (featured !== null && featured !== undefined) params.set('featured', featured);
   if (sort) params.set('sort', sort);
+  if (include_onsite) params.set('include_onsite', 'true');
 
   const res = await fetch(`${API_BASE}/api/jobs?${params.toString()}`);
   if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to fetch jobs`);

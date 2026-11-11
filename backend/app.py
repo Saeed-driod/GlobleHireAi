@@ -112,7 +112,8 @@ def list_jobs(
     job_type: Optional[str] = Query(None),
     country: Optional[str] = Query(None),
     featured: Optional[bool] = Query(None),
-    sort: str = Query("latest", regex="^(latest|popular|featured)$")
+    sort: str = Query("latest", regex="^(latest|popular|featured)$"),
+    include_onsite: bool = Query(False)
 ):
     try:
         data = get_jobs(
@@ -123,7 +124,8 @@ def list_jobs(
             job_type=job_type,
             country=country,
             featured=featured,
-            sort=sort
+            sort=sort,
+            include_onsite=include_onsite
         )
         return data
     except Exception as e:
