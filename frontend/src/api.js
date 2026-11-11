@@ -35,6 +35,7 @@ export async function fetchJobDetails(jobId) {
   if (!res.ok) throw new Error(`HTTP ${res.status}: Job not found`);
   return res.json();
 }
+export const fetchJobById = fetchJobDetails;
 
 export async function logJobApply(jobId) {
   const res = await fetch(`${API_BASE}/api/jobs/${jobId}/apply`, {

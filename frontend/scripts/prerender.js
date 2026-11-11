@@ -178,11 +178,19 @@ async function run() {
               </div>
 
               <h1 class="text-2xl sm:text-3xl font-black text-[#17261F]">${escapeHtml(job.title)}</h1>
-              <p class="text-base font-bold text-[#57685E] mt-1">${escapeHtml(job.company_name)} • <span class="text-[#0A5734]">${escapeHtml(job.location || 'Worldwide Remote')}</span></p>
+              <p class="text-base font-bold text-[#57685E] mt-1 flex flex-wrap items-center gap-2">
+                <span>${escapeHtml(job.company_name)}</span>
+                <span>•</span>
+                <span class="text-[#0A5734]">${escapeHtml(job.location || 'Worldwide Remote')}</span>
+                <span>•</span>
+                <a href="${escapeHtml(job.apply_url)}" target="_blank" rel="noopener noreferrer" class="text-xs text-[#0A5734] underline font-mono">
+                  via ${escapeHtml(job.source_api || 'Remotive')} ↗
+                </a>
+              </p>
 
               <div class="mt-6 flex flex-wrap items-center gap-3">
                 <a href="${escapeHtml(job.apply_url)}" target="_blank" rel="noopener noreferrer" class="px-6 py-3 rounded-2xl bg-[#00DF81] text-[#0A241B] font-extrabold text-xs sm:text-sm hover:bg-[#2EF8A0] transition-all shadow-md">
-                  Apply for this Role →
+                  Apply on ${escapeHtml(job.source_api || 'Official Board')} →
                 </a>
                 <a href="/" class="px-5 py-3 rounded-2xl bg-[#F4F6F2] text-[#17261F] font-bold text-xs sm:text-sm hover:bg-slate-200 transition-all">
                   ← Back to All Remote Jobs
@@ -253,7 +261,15 @@ async function run() {
                   <h2 class="text-base font-bold text-[#17261F]">
                     <a href="/jobs/${slugify(j.title)}-${slugify(j.company_name)}-${j.id}" class="hover:underline">${escapeHtml(j.title)}</a>
                   </h2>
-                  <p class="text-xs font-semibold text-[#57685E] mt-1">${escapeHtml(j.company_name)} • ${escapeHtml(j.location || 'Remote')}</p>
+                  <p class="text-xs font-semibold text-[#57685E] mt-1 flex flex-wrap items-center gap-1">
+                    <span>${escapeHtml(j.company_name)}</span>
+                    <span>•</span>
+                    <span>${escapeHtml(j.location || 'Remote')}</span>
+                    <span>•</span>
+                    <a href="${escapeHtml(j.apply_url)}" target="_blank" rel="noopener noreferrer" class="text-[#0A5734] hover:underline font-mono text-[11px]">
+                      via ${escapeHtml(j.source_api || 'Remotive')}
+                    </a>
+                  </p>
                   <p class="text-xs text-[#6C7A72] mt-2 line-clamp-2">${escapeHtml(j.excerpt || '')}</p>
                 </div>
                 <div class="mt-4 pt-3 border-t border-black/[0.05] flex items-center justify-between text-xs">

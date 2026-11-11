@@ -109,10 +109,22 @@ export default function JobCard({
             >
               {job.title}
             </h3>
-            <p className="text-xs font-semibold text-[#6C7A72] dark:text-slate-400 flex items-center gap-1.5 mt-0.5">
+            
+            {/* Company Name & Step 6 Clickable Source Attribution */}
+            <p className="text-xs font-semibold text-[#6C7A72] dark:text-slate-400 flex flex-wrap items-center gap-1.5 mt-0.5">
               <span>{job.company_name}</span>
               <span className="text-slate-300 dark:text-slate-600">•</span>
-              <span className="font-mono text-[11px] text-[#8C9B92]">via {job.source_api || 'Remotive'}</span>
+              <a
+                href={job.apply_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                title={`View original job posting on ${job.source_api || 'source'}`}
+                className="font-mono text-[11px] text-[#0A5734] dark:text-[#00DF81] hover:underline inline-flex items-center gap-0.5"
+              >
+                via {job.source_api || 'Remotive'}
+                <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+              </a>
             </p>
           </div>
 
