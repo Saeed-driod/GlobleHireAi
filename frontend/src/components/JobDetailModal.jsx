@@ -4,7 +4,7 @@ import confetti from 'canvas-confetti';
 import PlaycardModal from './PlaycardModal';
 import { fetchJobDetails, logJobApply } from '../api';
 
-export default function JobDetailModal({ jobId, onClose, onTagClick, onSelectRelated }) {
+export default function JobDetailModal({ jobId, onClose, onTagClick, onSelectRelated, onApplyClick }) {
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -26,20 +26,11 @@ export default function JobDetailModal({ jobId, onClose, onTagClick, onSelectRel
 
   if (!jobId) return null;
 
-  const handleApply = async () => {
-    try {
-      confetti({
-        particleCount: 40,
-        spread: 60,
-        origin: { y: 0.6 },
-        colors: ['#00DF81', '#10B981', '#0A241B']
-      });
-    } catch (e) {}
-
-    try {
-      const res = await logJobApply(job.id);
-      window.open(res.apply_url || job.apply_url, '_blank', 'noopener,noreferrer');
-    } catch (e) {
+  const handleApply = () => {
+    if (!job) return;
+    if (onApplyClick) {
+      onApplyClick(job);
+    } else {
       window.open(job.apply_url, '_blank', 'noopener,noreferrer');
     }
   };

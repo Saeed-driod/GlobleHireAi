@@ -36,6 +36,12 @@ export default function App() {
   const [selectedJobId, setSelectedJobId] = useState(null);
   const [postModalOpen, setPostModalOpen] = useState(false);
   const [candidateModalOpen, setCandidateModalOpen] = useState(false);
+  const [applyingJob, setApplyingJob] = useState(null);
+
+  const handleApplyClick = (job) => {
+    setApplyingJob(job);
+    setCandidateModalOpen(true);
+  };
 
   // Check URL hash & session on mount + track visitor
   useEffect(() => {
@@ -321,6 +327,7 @@ export default function App() {
                     job={job}
                     onSelect={(j) => setSelectedJobId(j.id)}
                     onTagClick={handleTagClick}
+                    onApplyClick={handleApplyClick}
                   />
                 </React.Fragment>
               );
@@ -392,6 +399,10 @@ export default function App() {
           onClose={() => setSelectedJobId(null)}
           onTagClick={handleTagClick}
           onSelectRelated={(id) => setSelectedJobId(id)}
+          onApplyClick={(job) => {
+            setSelectedJobId(null);
+            handleApplyClick(job);
+          }}
         />
       )}
 
@@ -408,7 +419,11 @@ export default function App() {
 
       <CandidateModal
         isOpen={candidateModalOpen}
-        onClose={() => setCandidateModalOpen(false)}
+        onClose={() => {
+          setCandidateModalOpen(false);
+          setApplyingJob(null);
+        }}
+        targetJob={applyingJob}
       />
 
     </div>

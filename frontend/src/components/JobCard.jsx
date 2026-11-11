@@ -16,23 +16,12 @@ function formatTimeAgo(isoString) {
   }
 }
 
-export default function JobCard({ job, onSelect, onTagClick }) {
-  const handleApply = async (e) => {
+export default function JobCard({ job, onSelect, onTagClick, onApplyClick }) {
+  const handleApply = (e) => {
     e.stopPropagation();
-    
-    try {
-      confetti({
-        particleCount: 35,
-        spread: 60,
-        origin: { y: 0.8 },
-        colors: ['#00DF81', '#10B981', '#0A241B']
-      });
-    } catch (err) {}
-
-    try {
-      const res = await logJobApply(job.id);
-      window.open(res.apply_url || job.apply_url, '_blank', 'noopener,noreferrer');
-    } catch (error) {
+    if (onApplyClick) {
+      onApplyClick(job);
+    } else {
       window.open(job.apply_url, '_blank', 'noopener,noreferrer');
     }
   };
