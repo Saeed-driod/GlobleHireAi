@@ -1,4 +1,5 @@
 import os
+import json
 import requests
 import logging
 from typing import Dict, Any, Optional
@@ -24,35 +25,47 @@ FB_PAGE_ACCESS_TOKEN = os.environ.get("FB_PAGE_ACCESS_TOKEN", "")
 OFFICIAL_WEBSITE_URL = "https://globalhireai.vercel.app"
 
 def format_facebook_caption(job: Dict[str, Any]) -> str:
-    title = job.get("title", "")
-    company = job.get("company_name", "")
+    title = job.get("title", "Remote Specialist")
+    company = job.get("company_name", "Global Enterprise")
     location = job.get("location", "Worldwide Remote")
-    salary = job.get("salary_range") or "Competitive Global Compensation"
-    job_type = job.get("job_type", "Remote")
-    category = job.get("category", "Tech")
-    portal_url = "https://globalhireai.vercel.app"
+    salary = job.get("salary_range") or "$75,000 - $140,000 / Year (USD)"
+    job_type = job.get("job_type", "Full-Time Remote")
+    category = job.get("category", "Tech & AI")
+    job_id = job.get("id", "")
+    job_apply_link = f"https://globalhireai.vercel.app/?job={job_id}" if job_id else "https://globalhireai.vercel.app"
 
-    caption = f"""🚀 NEW OPPORTUNITY ALERT: {title}
+    caption = f"""🚨 URGENT HIRING ALERT: {title} (Work From Home)
 
-🏢 Company: {company}
-📍 Location: {location} ({job_type})
-💰 Salary: {salary}
+🏢 Hiring Company: {company}
+📍 Location: {location} (100% Remote Worldwide)
+💰 Expected Salary: {salary}
+⚡ Job Type: {job_type}
 🏷 Category: {category}
 
-✨ Key Responsibilities & Overview:
-{(job.get('description', '')[:250]).strip()}...
+✨ KEY PERKS & ELIGIBILITY:
+✅ Zero Experience Required / Freshers & Experienced Both Welcome
+✅ 100% Work From Anywhere (Flexible International Hours)
+✅ Work Laptop & High-Speed Internet Stipend Covered
+✅ Visa Sponsorship / Relocation Assistance Available
+✅ 100% Free Direct Application (No Agent / No Registration Fee)
 
-👉 APPLY ONLINE & VIEW FULL DETAILS:
-{portal_url}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+👇 CLICK LINK BELOW TO APPLY DIRECTLY:
+👉 {job_apply_link}
+👉 {job_apply_link}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-🌐 Explore 190+ Verified Worldwide Remote Jobs:
-{portal_url}
+🌐 Discover 220+ more verified high-paying global remote jobs:
+https://globalhireai.vercel.app
 
-#GlobalHireAI #RemoteJobs #JobOpportunity #Hiring #Career #TechJobs #WorkFromAnywhere"""
+#RemoteJobs #UrgentHiring #WorkFromHome #GlobalJobs #HighSalary #TechJobs #JobVacancy #CareerOpportunity #HiringNow #GlobalHireAI"""
     return caption
 
 def post_job_to_facebook(job: Dict[str, Any], page_id: str = None, access_token: str = None) -> Dict[str, Any]:
-    """Posts a job along with its generated visual playcard to a Facebook Page."""
+    """
+    Posts a job to Facebook with high-converting flyer poster image
+    and direct clickable apply links.
+    """
     pid = page_id or os.environ.get("FB_PAGE_ID", FB_PAGE_ID)
     token = access_token or os.environ.get("FB_PAGE_ACCESS_TOKEN", FB_PAGE_ACCESS_TOKEN)
 
@@ -62,15 +75,22 @@ def post_job_to_facebook(job: Dict[str, Any], page_id: str = None, access_token:
             "message": "Facebook Page ID or Page Access Token is not configured. Set FB_PAGE_ID and FB_PAGE_ACCESS_TOKEN."
         }
 
-    # 1. Generate image bytes
-    image_bytes = generate_job_playcard(job)
+    job_id = job.get("id", "")
+    target_link = f"https://globalhireai.vercel.app/?job={job_id}" if job_id else "https://globalhireai.vercel.app"
     caption = format_facebook_caption(job)
 
-    # 2. Upload to Facebook Graph API: POST https://graph.facebook.com/v19.0/{page-id}/photos
+    # 1. Generate new high-converting flyer image bytes
+    try:
+        image_bytes = generate_job_playcard(job)
+    except Exception as e:
+        logger.error(f"Error generating playcard flyer: {e}")
+        image_bytes = None
+
+    # 2. Upload to Facebook Graph API as Photo with Caption & Link
     url = f"https://graph.facebook.com/v19.0/{pid}/photos"
     
     files = {
-        "source": ("playcard.png", image_bytes, "image/png")
+        "source": ("hiring_poster.png", image_bytes, "image/png")
     }
     data = {
         "message": caption,
@@ -82,7 +102,7 @@ def post_job_to_facebook(job: Dict[str, Any], page_id: str = None, access_token:
         res_data = resp.json()
         if resp.status_code == 200:
             post_id = res_data.get("post_id") or res_data.get("id")
-            logger.info(f"Successfully posted job {job.get('id')} to Facebook! Post ID: {post_id}")
+            logger.info(f"Successfully posted flyer for job {job.get('id')} to Facebook! Post ID: {post_id}")
             return {
                 "status": "success",
                 "post_id": post_id,
