@@ -128,3 +128,4 @@ def send_job_match_email(candidate: Dict[str, Any], job: Dict[str, Any]) -> bool
     except Exception as e:
         logger.error(f"[Email Error] Failed to send alert to {to_email}: {e}")
         return False
+

@@ -151,39 +151,43 @@
     <script type="module" src="/src/main.jsx"></script>
 
     <!-- ========================================================================= -->
-    <!-- 6. MONETAG AD NETWORK SCRIPTS (DEFERRED SAFE LOADER)                      -->
+    <!-- 6. MONETAG AD NETWORK SCRIPTS (SAFE ASYNC LOADER)                         -->
     <!-- ========================================================================= -->
     <script>
-      window.addEventListener('DOMContentLoaded', function() {
-        try {
-          var loadScript = function(src, attrs) {
-            var s = document.createElement('script');
-            s.src = src;
-            s.async = true;
-            s.setAttribute('data-cfasync', 'false');
-            if (attrs) {
-              for (var k in attrs) s.setAttribute(k, attrs[k]);
-            }
-            document.body.appendChild(s);
-          };
+      window.addEventListener('load', function() {
+        setTimeout(function() {
+          try {
+            var loadScript = function(src, attrs) {
+              try {
+                var s = document.createElement('script');
+                s.src = src;
+                s.async = true;
+                s.setAttribute('data-cfasync', 'false');
+                if (attrs) {
+                  for (var k in attrs) s.setAttribute(k, attrs[k]);
+                }
+                document.head.appendChild(s);
+              } catch (err) {}
+            };
 
-          // Monetag MultiTag & In-Page Push
-          loadScript('https://quge5.com/88/tag.min.js', {'data-zone': '308627'});
+            // MultiTag (Zone 308627)
+            loadScript('https://quge5.com/88/tag.min.js', {'data-zone': '308627'});
 
-          // Monetag Zone 12236001
-          (function(s){s.dataset.zone='12236001',s.src='https://al5sm.com/tag.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')));
+            // Zone 12236001
+            loadScript('https://al5sm.com/tag.min.js', {'data-zone': '12236001'});
 
-          // Monetag Zone 12236002
-          loadScript('https://5gvci.com/act/files/tag.min.js?z=12236002');
+            // Zone 12236002
+            loadScript('https://5gvci.com/act/files/tag.min.js?z=12236002');
 
-          // Monetag Zone 12236004
-          (function(s){s.dataset.zone='12236004',s.src='https://nap5k.com/tag.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')));
+            // Zone 12236004
+            loadScript('https://nap5k.com/tag.min.js', {'data-zone': '12236004'});
 
-          // Monetag Vignette Banner (Zone 12236005)
-          (function(s){s.dataset.zone='12236005',s.src='https://n6wxm.com/vignette.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')));
-        } catch (e) {
-          console.warn('Monetag deferred load:', e);
-        }
+            // Zone 12236005 (Vignette)
+            loadScript('https://n6wxm.com/vignette.min.js', {'data-zone': '12236005'});
+          } catch (e) {
+            console.warn('Monetag loader:', e);
+          }
+        }, 1500);
       });
     </script>
   </body>

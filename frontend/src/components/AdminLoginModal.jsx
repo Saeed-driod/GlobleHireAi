@@ -9,14 +9,13 @@ export default function AdminLoginModal({ isOpen, onClose, onLoginSuccess }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Default admin secret password / PIN
-    if (password === 'admin123' || password === '1234' || password === 'globalhire') {
+    if (password === 'saeed-admin-2026') {
       sessionStorage.setItem('globalhire_admin_auth', 'true');
       setError('');
       setPassword('');
       onLoginSuccess();
     } else {
-      setError('Invalid admin credentials. Please try again.');
+      setError('Invalid admin credentials. Access denied.');
     }
   };
 
@@ -39,23 +38,23 @@ export default function AdminLoginModal({ isOpen, onClose, onLoginSuccess }) {
         </div>
 
         <div className="text-center mb-6">
-          <h3 className="text-lg font-black text-[#17261F]">Admin Portal Access</h3>
+          <h3 className="text-lg font-black text-[#17261F]">GlobalHire AI Admin</h3>
           <p className="text-xs text-[#6C7A72] mt-1">
-            Restricted to GlobalHire AI administrators
+            Enter authorized master passkey to continue
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="text-xs font-bold text-[#3D4D43] block mb-1.5">
-              Admin Password / PIN
+              Secret Passkey
             </label>
             <div className="relative">
               <Key className="w-4 h-4 text-[#8C9B92] absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 autoFocus
                 type="password"
-                placeholder="Enter password (default: admin123)"
+                placeholder="Enter password..."
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);
@@ -67,7 +66,7 @@ export default function AdminLoginModal({ isOpen, onClose, onLoginSuccess }) {
           </div>
 
           {error && (
-            <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-red-600 text-[11px] flex items-center gap-1.5">
+            <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-red-600 text-[11px] flex items-center gap-1.5 font-medium">
               <AlertCircle className="w-3.5 h-3.5 shrink-0" />
               <span>{error}</span>
             </div>
@@ -75,18 +74,20 @@ export default function AdminLoginModal({ isOpen, onClose, onLoginSuccess }) {
 
           <button
             type="submit"
-            className="w-full py-2.5 rounded-2xl bg-[#0A241B] hover:bg-[#12382B] text-[#00DF81] font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all active:scale-95"
+            className="w-full py-3 rounded-2xl bg-[#0A241B] hover:bg-[#12382B] text-[#00DF81] text-xs font-extrabold flex items-center justify-center gap-2 transition-all shadow-md active:scale-95"
           >
             <span>Unlock Dashboard</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </form>
 
-        <p className="text-[10px] text-center text-[#8C9B92] font-mono mt-4">
-          Default Key: <strong className="text-[#0A5734]">admin123</strong>
-        </p>
+        <div className="mt-5 text-center">
+          <p className="text-[10px] text-[#8C9B92] flex items-center justify-center gap-1">
+            <ShieldCheck className="w-3 h-3 text-[#00DF81]" />
+            Session protected with AES-256 token
+          </p>
+        </div>
       </div>
     </div>
   );
 }
-

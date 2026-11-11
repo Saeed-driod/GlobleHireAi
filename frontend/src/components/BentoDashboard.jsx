@@ -1,635 +1,826 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Activity, Database, MousePointerClick, RefreshCw, Server, 
-  ArrowUpRight, TrendingUp, Layers, Terminal, Trash2, Star, 
-  Search, Globe, DollarSign, Briefcase, ChevronLeft, ChevronRight,
-  ExternalLink, Eye, CheckCircle2, Sparkles, Calendar as CalendarIcon,
-  Users, Bell, Compass, ArrowRight, ShieldCheck, Flame, Share2, Download
+  Activity, Users, Globe, Eye, RefreshCw, Smartphone, Laptop, 
+  Share2, Search, Trash2, Mail, Phone, GraduationCap, Briefcase, 
+  Sparkles, CheckCircle2, AlertCircle, ArrowUpRight, ShieldCheck, 
+  LogOut, ExternalLink, Filter, Calendar, TrendingUp, Layers, ChevronRight
 } from 'lucide-react';
-import confetti from 'canvas-confetti';
-import PlaycardModal from './PlaycardModal';
 import { 
+  fetchTrafficAnalytics, 
+  fetchCandidates, 
+  deleteCandidate, 
   fetchDashboardStats, 
   triggerWorkerSync, 
+  fetchJobs, 
   toggleJobFeatured, 
-  deleteJob, 
-  fetchJobs,
-  getExportCsvUrl
+  deleteJob 
 } from '../api';
 
-export default function BentoDashboard({ onBackToPortal, onSelectJob }) {
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
-  const [syncMsg, setSyncMsg] = useState('');
-  const [activeTab, setActiveTab] = useState('overview');
+export default function BentoDashboard({ onBackToPortal }) {
+  const [activeTab, setActiveTab] = useState('traffic'); // 'traffic' | 'candidates' | 'jobs'
+  
+  // Traffic Analytics State
+  const [traffic, setTraffic] = useState(null);
+  const [trafficLoading, setTrafficLoading] = useState(true);
+
+  // Candidates State
+  const [candidates, setCandidates] = useState([]);
+  const [candidateTotal, setCandidateTotal] = useState(0);
+  const [candidateSearch, setCandidateSearch] = useState('');
+  const [candidatesLoading, setCandidatesLoading] = useState(true);
+  const [selectedCandidate, setSelectedCandidate] = useState(null);
+
+  // Jobs & System State
   const [jobs, setJobs] = useState([]);
+  const [jobTotal, setJobTotal] = useState(0);
   const [jobSearch, setJobSearch] = useState('');
   const [jobsLoading, setJobsLoading] = useState(false);
-  const [selectedPlaycardJob, setSelectedPlaycardJob] = useState(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState('');
+  const [stats, setStats] = useState(null);
 
-  // Calendar state for the V22 November 2026 widget
-  const calendarDays = [
-    { day: 'M', date: 9, active: false },
-    { day: 'T', date: 10, active: true },
-    { day: 'W', date: 11, active: false },
-    { day: 'T', date: 12, active: false },
-    { day: 'F', date: 13, active: false },
-    { day: 'S', date: 14, active: false },
-    { day: 'S', date: 15, active: false },
-  ];
+  // Auto-refresh interval
+  useEffect(() => {
+    loadAllData();
+    const interval = setInterval(() => {
+      loadTraffic();
+      loadCandidates();
+    }, 20000);
+    return () => clearInterval(interval);
+  }, []);
 
-  const loadStats = async () => {
+  const loadAllData = () => {
+    loadTraffic();
+    loadCandidates();
+    loadJobs();
+    loadSystemStats();
+  };
+
+  const loadTraffic = async () => {
+    setTrafficLoading(true);
     try {
-      const data = await fetchDashboardStats();
-      setStats(data);
-      if (data.is_syncing_now) {
-        setSyncing(true);
-      }
+      const res = await fetchTrafficAnalytics();
+      setTraffic(res);
     } catch (err) {
-      console.error("Failed to load dashboard stats:", err);
+      console.error('Failed to load traffic:', err);
     } finally {
-      setLoading(false);
+      setTrafficLoading(false);
     }
   };
 
-  const loadJobsList = async () => {
+  const loadCandidates = async () => {
+    setCandidatesLoading(true);
+    try {
+      const res = await fetchCandidates({ page: 1, limit: 100, q: candidateSearch });
+      setCandidates(res.candidates || []);
+      setCandidateTotal(res.total || 0);
+    } catch (err) {
+      console.error('Failed to load candidates:', err);
+    } finally {
+      setCandidatesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadCandidates();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [candidateSearch]);
+
+  const loadJobs = async () => {
     setJobsLoading(true);
     try {
-      const res = await fetchJobs({ page: 1, limit: 20, q: jobSearch });
+      const res = await fetchJobs({ page: 1, limit: 25, q: jobSearch });
       setJobs(res.jobs || []);
+      setJobTotal(res.total || 0);
     } catch (err) {
-      console.error(err);
+      console.error('Failed to load jobs:', err);
     } finally {
       setJobsLoading(false);
     }
   };
 
   useEffect(() => {
-    loadStats();
-    loadJobsList();
-    const interval = setInterval(loadStats, 15000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
     const timer = setTimeout(() => {
-      loadJobsList();
+      loadJobs();
     }, 300);
     return () => clearTimeout(timer);
   }, [jobSearch]);
 
-  const handleTriggerSync = async () => {
+  const loadSystemStats = async () => {
+    try {
+      const res = await fetchDashboardStats();
+      setStats(res);
+    } catch (err) {}
+  };
+
+  const handleSyncWorker = async () => {
     setSyncing(true);
-    setSyncMsg('Connecting to Oracle VM Auto-Pilot worker...');
+    setSyncMsg('Triggering worker sync on Oracle VM...');
     try {
       const res = await triggerWorkerSync();
-      setSyncMsg(res.message || 'Worker sync cycle started!');
-      confetti({
-        particleCount: 40,
-        spread: 60,
-        origin: { y: 0.3 },
-        colors: ['#00DF81', '#10B981', '#0A241B']
-      });
+      setSyncMsg(res.message || 'Worker sync launched successfully!');
       setTimeout(() => {
-        loadStats();
-        loadJobsList();
-      }, 4000);
-    } catch (err) {
-      setSyncMsg('Failed to trigger worker.');
-    } finally {
-      setTimeout(() => {
+        loadJobs();
+        loadSystemStats();
         setSyncing(false);
         setSyncMsg('');
-      }, 6000);
+      }, 4000);
+    } catch (err) {
+      setSyncMsg('Sync trigger error: ' + err.message);
+      setSyncing(false);
     }
   };
 
-  const handleToggleFeature = async (id) => {
+  const handleDeleteCandidate = async (id, e) => {
+    e.stopPropagation();
+    if (!window.confirm('Are you sure you want to delete this candidate?')) return;
     try {
-      await toggleJobFeatured(id);
-      loadJobsList();
-      loadStats();
+      await deleteCandidate(id);
+      setCandidates(prev => prev.filter(c => c.id !== id));
+      setCandidateTotal(prev => Math.max(0, prev - 1));
+      if (selectedCandidate?.id === id) setSelectedCandidate(null);
     } catch (err) {
-      alert("Error updating job: " + err.message);
+      alert('Delete failed: ' + err.message);
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Remove this listing from the database?")) return;
+  const handleToggleFeatured = async (jobId) => {
     try {
-      await deleteJob(id);
-      loadJobsList();
-      loadStats();
+      const res = await toggleJobFeatured(jobId);
+      setJobs(prev => prev.map(j => j.id === jobId ? { ...j, featured: res.featured } : j));
     } catch (err) {
-      alert("Error deleting job: " + err.message);
+      alert('Failed to update job');
     }
   };
+
+  const handleDeleteJob = async (jobId) => {
+    if (!window.confirm('Delete this job?')) return;
+    try {
+      await deleteJob(jobId);
+      setJobs(prev => prev.filter(j => j.id !== jobId));
+      setJobTotal(prev => Math.max(0, prev - 1));
+    } catch (err) {
+      alert('Failed to delete job');
+    }
+  };
+
+  // Helper calculation for Traffic percentages
+  const totalViews = traffic?.total_pageviews || 0;
+  const topReferrers = traffic?.top_referrers || [];
+  const topCountries = traffic?.top_countries || [];
+  const devices = traffic?.devices || [];
 
   return (
-    <div className="min-h-screen bg-[#ECEEE9] text-[#17261F] p-3 sm:p-6 lg:p-8 flex gap-6 font-sans">
-      
-      {/* FLOATING V22 OBSIDIAN FOREST SIDEBAR */}
-      <aside className="hidden lg:flex w-20 bg-[#0A241B] rounded-[32px] p-4 flex-col justify-between items-center shadow-2xl shrink-0 border border-white/5">
-        
-        {/* Brand Icon */}
-        <div className="w-12 h-12 rounded-2xl bg-[#00DF81] flex items-center justify-center text-[#0A241B] font-black text-xl shadow-[0_0_20px_rgba(0,223,129,0.4)]">
-          G
-        </div>
-
-        {/* Center Icons */}
-        <nav className="flex flex-col gap-4">
-          {[
-            { id: 'overview', icon: Layers, label: 'Bento' },
-            { id: 'live-jobs', icon: Briefcase, label: 'Jobs' },
-            { id: 'autopilot', icon: RefreshCw, label: 'Autopilot' },
-            { id: 'monetization', icon: DollarSign, label: 'Revenue' },
-            { id: 'health', icon: Server, label: 'Oracle VM' }
-          ].map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                title={item.label}
-                className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 ${
-                  isActive 
-                    ? 'bg-[#00DF81] text-[#0A241B] shadow-[0_4px_16px_rgba(0,223,129,0.35)] scale-105 font-bold' 
-                    : 'text-emerald-100/60 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                <Icon className="w-5 h-5" />
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* Bottom Profile Pill & Portal Link */}
-        <div className="flex flex-col items-center gap-3">
-          <button
-            onClick={onBackToPortal}
-            title="Return to Public Job Portal"
-            className="w-11 h-11 rounded-2xl bg-white/10 hover:bg-[#00DF81] text-white hover:text-[#0A241B] flex items-center justify-center transition-all duration-300 shadow-sm"
-          >
-            <ArrowUpRight className="w-5 h-5" />
-          </button>
-          
-          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-emerald-400 to-teal-500 p-0.5 shadow-md">
-            <div className="w-full h-full rounded-full bg-[#0A241B] flex items-center justify-center text-xs font-bold text-[#00DF81]">
-              AI
-            </div>
-          </div>
-        </div>
-
-      </aside>
-
-      {/* MAIN BENTO CANVAS */}
-      <main className="flex-1 space-y-6 max-w-7xl mx-auto overflow-hidden">
-        
-        {/* TOP MOBILE BAR */}
-        <div className="flex lg:hidden items-center justify-between bg-white px-5 py-3 rounded-2xl shadow-sm border border-black/[0.05]">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-[#00DF81] flex items-center justify-center text-[#0A241B] font-bold">
+    <div className="min-h-screen bg-[#ECEEE9] text-[#17261F] pb-24">
+      {/* Top Header */}
+      <header className="sticky top-0 z-40 bg-[#0A241B] text-white border-b border-black/20 shadow-lg">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-[#00DF81] text-[#0A241B] flex items-center justify-center font-black text-xl shadow-md">
               G
             </div>
-            <span className="font-bold text-sm text-[#0A241B]">GlobalHire AI</span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleTriggerSync}
-              disabled={syncing}
-              className="px-3 py-1.5 rounded-xl bg-[#0A241B] text-[#00DF81] text-xs font-semibold flex items-center gap-1.5"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
-              <span>{syncing ? 'Syncing' : 'Sync'}</span>
-            </button>
-            <button
-              onClick={onBackToPortal}
-              className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-semibold"
-            >
-              Portal ↗
-            </button>
-          </div>
-        </div>
-
-        {/* ================= V22 TOP ROW ================= */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
-          
-          {/* Card 1: "Work's always better together" Big Forest Card (Span 5) */}
-          <div className="md:col-span-5 bg-[#0A241B] rounded-[28px] p-6 text-white relative overflow-hidden flex flex-col justify-between shadow-xl min-h-[220px]">
-            {/* Subtle wavy green background mesh */}
-            <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-bl from-[#00DF81]/20 via-[#0A241B]/0 to-transparent rounded-full blur-3xl pointer-events-none"></div>
-
-            <div className="relative z-10 flex items-start justify-between">
-              <div>
-                <span className="text-[10px] font-mono tracking-widest uppercase px-2.5 py-1 rounded-full bg-white/10 text-emerald-300 font-semibold">
-                  Dashboard V22
-                </span>
-                <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-3 leading-snug">
-                  Work's always <br />
-                  <span className="text-[#00DF81]">better together</span>
-                </h2>
-              </div>
-
-              {/* Status Badge */}
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/10 text-xs text-white">
-                <span className="w-2 h-2 rounded-full bg-[#00DF81] pulse-glow"></span>
-                <span className="font-medium text-xs">Oracle VM</span>
-              </div>
-            </div>
-
-            <div className="relative z-10 pt-6 flex items-center justify-between border-t border-white/10 mt-4">
-              {/* Stacked Avatars */}
-              <div className="flex items-center -space-x-2">
-                <div className="w-9 h-9 rounded-full bg-emerald-300 border-2 border-[#0A241B] flex items-center justify-center text-[#0A241B] font-bold text-xs">
-                  JD
-                </div>
-                <div className="w-9 h-9 rounded-full bg-teal-200 border-2 border-[#0A241B] flex items-center justify-center text-[#0A241B] font-bold text-xs">
-                  SK
-                </div>
-                <div className="w-9 h-9 rounded-full bg-cyan-200 border-2 border-[#0A241B] flex items-center justify-center text-[#0A241B] font-bold text-xs">
-                  MR
-                </div>
-                <div className="w-9 h-9 rounded-full bg-white/20 backdrop-blur-md border-2 border-[#0A241B] flex items-center justify-center text-white font-bold text-xs">
-                  +143
-                </div>
-              </div>
-
-              {/* Trigger Button */}
-              <button
-                onClick={handleTriggerSync}
-                disabled={syncing}
-                className="px-4 py-2 rounded-2xl bg-[#00DF81] hover:bg-[#2EF8A0] text-[#0A241B] font-bold text-xs flex items-center gap-1.5 shadow-[0_4px_16px_rgba(0,223,129,0.3)] transition-all active:scale-95"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
-                <span>{syncing ? 'Aggregating...' : 'Sync Now'}</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Card 2: Stat Card "Active Jobs" (Span 2) */}
-          <div className="md:col-span-2 v22-card p-6 flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-[#6C7A72]">Live Jobs</span>
-              <div className="w-7 h-7 rounded-full bg-[#E3F9ED] text-[#0A5734] flex items-center justify-center">
-                <Database className="w-3.5 h-3.5" />
-              </div>
-            </div>
-
-            <div className="my-3">
-              <h3 className="text-3xl font-black text-[#17261F] tracking-tight">
-                {stats ? stats.total_jobs : '143'}
-              </h3>
-              <p className="text-xs font-semibold text-[#00DF81] flex items-center gap-1 mt-1">
-                <ArrowUpRight className="w-3.5 h-3.5" /> +100% verified
-              </p>
-            </div>
-
-            <span className="text-[10px] font-mono text-[#8C9B92] block">
-              Deduplicated SQLite
-            </span>
-          </div>
-
-          {/* Card 3: Stat Card "Synced Today" (Span 2) */}
-          <div className="md:col-span-2 v22-card p-6 flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-[#6C7A72]">Today Intake</span>
-              <div className="w-7 h-7 rounded-full bg-[#E3F9ED] text-[#0A5734] flex items-center justify-center">
-                <Activity className="w-3.5 h-3.5" />
-              </div>
-            </div>
-
-            <div className="my-3">
-              <h3 className="text-3xl font-black text-[#17261F] tracking-tight">
-                {stats ? stats.new_jobs_today : '143'}
-              </h3>
-              <p className="text-xs font-semibold text-[#00DF81] flex items-center gap-1 mt-1">
-                <Flame className="w-3.5 h-3.5 text-amber-500" /> 4 public APIs
-              </p>
-            </div>
-
-            <span className="text-[10px] font-mono text-[#8C9B92] block">
-              Every 3 hours
-            </span>
-          </div>
-
-          {/* Card 4: Mini Calendar "November, 2026" (Span 3) */}
-          <div className="md:col-span-3 v22-card p-5 flex flex-col justify-between">
-            <div className="flex items-center justify-between mb-3">
+            <div>
               <div className="flex items-center gap-2">
-                <CalendarIcon className="w-4 h-4 text-[#0A241B]" />
-                <span className="text-xs font-bold text-[#17261F]">November, 2026</span>
+                <span className="font-extrabold text-base tracking-tight text-white">GlobalHire AI</span>
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-[#00DF81]/20 text-[#00DF81] border border-[#00DF81]/30">
+                  ADMIN COMMAND CENTER
+                </span>
               </div>
-              <div className="flex items-center gap-1">
-                <button className="p-1 rounded-lg hover:bg-slate-100 text-slate-500">
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                </button>
-                <button className="p-1 rounded-lg hover:bg-slate-100 text-slate-500">
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Weekday Row */}
-            <div className="grid grid-cols-7 gap-1 text-center">
-              {calendarDays.map((d, i) => (
-                <div key={i} className="flex flex-col items-center gap-1">
-                  <span className="text-[10px] font-semibold text-[#8C9B92]">{d.day}</span>
-                  <div className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-bold transition-all ${
-                    d.active 
-                      ? 'bg-[#00DF81] text-[#0A241B] shadow-[0_2px_8px_rgba(0,223,129,0.4)] scale-105' 
-                      : 'text-[#17261F] hover:bg-slate-100'
-                  }`}>
-                    {d.date}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-3 pt-2.5 border-t border-black/[0.05] flex items-center justify-between text-[11px] text-[#6C7A72]">
-              <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-[#00DF81]"></span>
-                Next sync in ~3h
-              </span>
-              <span className="font-mono text-[#0A241B] font-semibold">14:59 UTC</span>
-            </div>
-          </div>
-
-        </div>
-
-        {/* ================= V22 MIDDLE ROW ================= */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
-          
-          {/* Middle Left: Focus this week / Aggregation Trend Bar Chart (Span 5) */}
-          <div className="md:col-span-5 v22-card p-6 flex flex-col justify-between">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h4 className="text-sm font-bold text-[#17261F]">Intake cadence</h4>
-                <p className="text-[11px] text-[#6C7A72]">Real-time aggregation volume this week</p>
-              </div>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#E3F9ED] text-[#0A5734] font-semibold">
-                Auto-Pilot
-              </span>
-            </div>
-
-            {/* Clean Rounded Pill Bar Chart in V22 Mint Green */}
-            <div className="h-36 flex items-end gap-3 px-2 pt-4 pb-2 border-b border-black/[0.05]">
-              {stats?.trend_data?.map((day, idx) => {
-                const height = Math.min(100, Math.max(18, (day.jobs_added / 150) * 100));
-                const isToday = idx === 6;
-                return (
-                  <div key={idx} className="flex-1 flex flex-col items-center gap-2 h-full justify-end group">
-                    <span className="text-[10px] font-mono text-[#0A5734] opacity-0 group-hover:opacity-100 transition-opacity">
-                      +{day.jobs_added}
-                    </span>
-                    <div 
-                      style={{ height: `${height}%` }}
-                      className={`w-full max-w-[32px] rounded-full transition-all duration-300 ${
-                        isToday 
-                          ? 'bg-[#00DF81] shadow-[0_4px_12px_rgba(0,223,129,0.35)]' 
-                          : 'bg-[#D6DDD3] hover:bg-[#B8C4B3]'
-                      }`}
-                    ></div>
-                    <span className={`text-[10px] font-mono ${isToday ? 'font-bold text-[#0A241B]' : 'text-[#8C9B92]'}`}>
-                      {day.date.split(' ')[1]}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="mt-4 flex items-center justify-between text-xs text-[#6C7A72]">
-              <span>Peak ingestion: <strong className="text-[#17261F]">143 listings</strong></span>
-              <span className="font-semibold text-[#00DF81]">99.8% Success</span>
-            </div>
-          </div>
-
-          {/* Middle Center: Unleash Your Career / Auto-Pilot Aggregator (Span 4) */}
-          <div className="md:col-span-4 rounded-[28px] p-6 bg-gradient-to-br from-[#E3F9ED] via-[#D7F5E5] to-[#C9EFE0] border border-[#BCE8D3] flex flex-col justify-between shadow-sm relative overflow-hidden">
-            <div className="flex items-start justify-between">
-              <div className="w-10 h-10 rounded-2xl bg-[#0A241B] text-[#00DF81] flex items-center justify-center shadow-md">
-                <Sparkles className="w-5 h-5" />
-              </div>
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/70 text-[#0A5734]">
-                Pro Engine
-              </span>
-            </div>
-
-            <div className="my-4">
-              <h4 className="text-xl font-extrabold text-[#0A241B] tracking-tight leading-snug">
-                Unleash the <br />
-                Worldwide Job Radar
-              </h4>
-              <p className="text-xs text-[#1C5338] mt-2 leading-relaxed">
-                4 public API connectors running 24/7 on Ubuntu Oracle VM. Instant salary and skill normalization.
+              <p className="text-[10px] text-slate-300 font-mono hidden sm:block">
+                Server: Oracle VM (150.136.214.192) • Status: 24/7 Active
               </p>
             </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={loadAllData}
+              title="Refresh Analytics"
+              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all text-xs flex items-center gap-1.5"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${trafficLoading ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Refresh Data</span>
+            </button>
 
             <button
               onClick={onBackToPortal}
-              className="w-full py-2.5 px-4 rounded-2xl bg-[#0A241B] hover:bg-[#12382B] text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md active:scale-95"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#00DF81] hover:bg-[#2EF8A0] text-[#0A241B] text-xs font-bold transition-all shadow-md active:scale-95"
             >
-              <span>Explore Public Job Portal</span>
-              <ArrowRight className="w-3.5 h-3.5 text-[#00DF81]" />
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Exit Admin</span>
             </button>
           </div>
-
-          {/* Middle Right: Notifications / Terminal Feed (Span 3) */}
-          <div className="md:col-span-3 v22-card p-5 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Bell className="w-4 h-4 text-[#0A241B]" />
-                  <span className="text-xs font-bold text-[#17261F]">Scraper Feed</span>
-                </div>
-                <span className="w-2 h-2 rounded-full bg-[#00DF81] pulse-glow"></span>
-              </div>
-
-              <div className="space-y-2.5 overflow-y-auto max-h-[160px] pr-1">
-                {stats?.recent_sync_logs?.slice(0, 4).map((log) => (
-                  <div key={log.id} className="p-2.5 rounded-xl bg-[#F4F6F2] border border-black/[0.04] text-[11px] space-y-0.5">
-                    <div className="flex items-center justify-between font-mono">
-                      <span className="font-bold text-[#0A241B]">[{log.source}]</span>
-                      <span className="text-[10px] text-[#8C9B92]">{log.timestamp?.split('T')[1]?.split('.')[0] || 'Recent'}</span>
-                    </div>
-                    <div className="text-[#3D4D43] flex items-center justify-between">
-                      <span>+{log.jobs_added} added</span>
-                      <span className="text-[10px] font-bold text-[#0A5734] uppercase">{log.status}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-3 pt-2.5 border-t border-black/[0.05] flex items-center justify-between text-[11px] text-[#6C7A72]">
-              <span className="font-mono">Port 5001</span>
-              <button 
-                onClick={handleTriggerSync}
-                className="text-[#0A5734] font-semibold hover:underline"
-              >
-                Trigger Sync
-              </button>
-            </div>
-          </div>
-
         </div>
 
-        {/* ================= V22 BOTTOM ROW: JOBS TABLE ================= */}
-        <div className="v22-card p-6 space-y-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <h3 className="text-base font-extrabold text-[#17261F] flex items-center gap-2">
-                <Briefcase className="w-4 h-4 text-[#0A241B]" />
-                Recent Opportunities ({jobs.length} Loaded)
-              </h3>
-              <p className="text-xs text-[#6C7A72]">Manage verified listings, toggle promotional featured status, and track clicks</p>
+        {/* Tab Navigation */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-2 pt-1 pb-3 overflow-x-auto">
+          <button
+            onClick={() => setActiveTab('traffic')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold transition-all ${
+              activeTab === 'traffic'
+                ? 'bg-[#00DF81] text-[#0A241B] shadow-md'
+                : 'text-slate-300 hover:text-white hover:bg-white/10'
+            }`}
+          >
+            <TrendingUp className="w-4 h-4" />
+            <span>Traffic & Origin Analytics</span>
+            {traffic && (
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                activeTab === 'traffic' ? 'bg-[#0A241B] text-[#00DF81]' : 'bg-white/20 text-white'
+              }`}>
+                {traffic.views_today || 0} today
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('candidates')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold transition-all ${
+              activeTab === 'candidates'
+                ? 'bg-[#00DF81] text-[#0A241B] shadow-md'
+                : 'text-slate-300 hover:text-white hover:bg-white/10'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span>Candidate Form Submissions</span>
+            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+              activeTab === 'candidates' ? 'bg-[#0A241B] text-[#00DF81]' : 'bg-white/20 text-white'
+            }`}>
+              {candidateTotal} Leads
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('jobs')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold transition-all ${
+              activeTab === 'jobs'
+                ? 'bg-[#00DF81] text-[#0A241B] shadow-md'
+                : 'text-slate-300 hover:text-white hover:bg-white/10'
+            }`}
+          >
+            <Briefcase className="w-4 h-4" />
+            <span>Job Radar & Auto-Pilot</span>
+            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+              activeTab === 'jobs' ? 'bg-[#0A241B] text-[#00DF81]' : 'bg-white/20 text-white'
+            }`}>
+              {jobTotal} Jobs
+            </span>
+          </button>
+        </div>
+      </header>
+
+      {/* Main Content Area */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        {/* ============================================================== */}
+        {/* TAB 1: TRAFFIC & ORIGIN ANALYTICS                              */}
+        {/* ============================================================== */}
+        {activeTab === 'traffic' && (
+          <div className="space-y-8 animate-fadeIn">
+            {/* KPI Cards Row */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+              <div className="bg-white p-5 rounded-3xl border border-black/[0.08] shadow-sm">
+                <div className="flex items-center justify-between text-[#6C7A72] text-xs font-bold mb-2">
+                  <span>TOTAL PAGEVIEWS</span>
+                  <Eye className="w-4 h-4 text-[#00DF81]" />
+                </div>
+                <div className="text-3xl font-black text-[#17261F] font-mono">
+                  {traffic?.total_pageviews ?? '...'}
+                </div>
+                <p className="text-[11px] text-[#6C7A72] mt-1">All-time tracked visitors</p>
+              </div>
+
+              <div className="bg-white p-5 rounded-3xl border border-black/[0.08] shadow-sm">
+                <div className="flex items-center justify-between text-[#6C7A72] text-xs font-bold mb-2">
+                  <span>VIEWS TODAY</span>
+                  <Activity className="w-4 h-4 text-emerald-500" />
+                </div>
+                <div className="text-3xl font-black text-emerald-700 font-mono">
+                  {traffic?.views_today ?? '...'}
+                </div>
+                <p className="text-[11px] text-[#6C7A72] mt-1">Past 24 hours traffic</p>
+              </div>
+
+              <div className="bg-white p-5 rounded-3xl border border-black/[0.08] shadow-sm">
+                <div className="flex items-center justify-between text-[#6C7A72] text-xs font-bold mb-2">
+                  <span>UNIQUE VISITORS</span>
+                  <Globe className="w-4 h-4 text-blue-500" />
+                </div>
+                <div className="text-3xl font-black text-[#17261F] font-mono">
+                  {traffic?.unique_visitors ?? '...'}
+                </div>
+                <p className="text-[11px] text-[#6C7A72] mt-1">Unique IP addresses</p>
+              </div>
+
+              <div className="bg-white p-5 rounded-3xl border border-black/[0.08] shadow-sm">
+                <div className="flex items-center justify-between text-[#6C7A72] text-xs font-bold mb-2">
+                  <span>CANDIDATE LEADS</span>
+                  <Users className="w-4 h-4 text-purple-500" />
+                </div>
+                <div className="text-3xl font-black text-purple-700 font-mono">
+                  {candidateTotal}
+                </div>
+                <p className="text-[11px] text-[#6C7A72] mt-1">CVs & Alert subscribers</p>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <a
-                href={getExportCsvUrl()}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white hover:bg-slate-50 border border-black/[0.08] text-xs font-bold text-[#17261F] shadow-sm shrink-0 transition-colors"
-                title="Download CSV spreadsheet of all jobs"
-              >
-                <Download className="w-3.5 h-3.5 text-[#0A5734]" />
-                <span className="hidden sm:inline">Export CSV</span>
-              </a>
+            {/* Traffic Origin Breakdown (Where traffic comes from) */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              
+              {/* Traffic Sources (Facebook, Google, Direct, WhatsApp) */}
+              <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-black/[0.08] shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-base font-extrabold text-[#17261F] flex items-center gap-2">
+                      <Share2 className="w-4 h-4 text-[#00DF81]" />
+                      Traffic Origins & Acquisition Channels
+                    </h3>
+                    <p className="text-xs text-[#6C7A72] mt-0.5">
+                      Where visitors found GlobalHire AI (Facebook auto-posts, search, WhatsApp shares)
+                    </p>
+                  </div>
+                </div>
 
-              {/* Pill Search */}
-              <div className="relative w-full sm:w-60">
-                <Search className="w-3.5 h-3.5 text-[#8C9B92] absolute left-3 top-1/2 -translate-y-1/2" />
+                {topReferrers.length === 0 ? (
+                  <div className="py-12 text-center text-[#6C7A72] text-xs">
+                    No referral data logged yet. Traffic is recorded automatically on visitor arrival.
+                  </div>
+                ) : (
+                  <div className="space-y-4 mt-6">
+                    {topReferrers.map((item, idx) => {
+                      const pct = totalViews > 0 ? Math.round((item.count / totalViews) * 100) : 0;
+                      const isFB = item.referrer.toLowerCase().includes('facebook');
+                      const isGoogle = item.referrer.toLowerCase().includes('google');
+                      const isWA = item.referrer.toLowerCase().includes('whatsapp');
+                      
+                      return (
+                        <div key={idx} className="space-y-1.5">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-bold text-[#17261F] flex items-center gap-2">
+                              {isFB && <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>}
+                              {isGoogle && <span className="w-2.5 h-2.5 rounded-full bg-red-500"></span>}
+                              {isWA && <span className="w-2.5 h-2.5 rounded-full bg-green-500"></span>}
+                              {!isFB && !isGoogle && !isWA && <span className="w-2.5 h-2.5 rounded-full bg-slate-400"></span>}
+                              {item.referrer}
+                            </span>
+                            <div className="flex items-center gap-3 font-mono">
+                              <span className="text-xs font-bold text-[#0A241B]">{item.count} clicks</span>
+                              <span className="text-[11px] text-[#6C7A72] w-12 text-right">{pct}%</span>
+                            </div>
+                          </div>
+                          
+                          {/* Progress bar */}
+                          <div className="w-full h-2.5 rounded-full bg-[#ECEEE9] overflow-hidden">
+                            <div 
+                              className={`h-full rounded-full transition-all duration-500 ${
+                                isFB ? 'bg-blue-600' : isGoogle ? 'bg-red-500' : isWA ? 'bg-green-500' : 'bg-[#0A241B]'
+                              }`}
+                              style={{ width: `${Math.max(5, pct)}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Device Split (Mobile vs Desktop) */}
+              <div className="bg-white p-6 rounded-3xl border border-black/[0.08] shadow-sm flex flex-col justify-between">
+                <div>
+                  <h3 className="text-base font-extrabold text-[#17261F] flex items-center gap-2">
+                    <Smartphone className="w-4 h-4 text-emerald-600" />
+                    Visitor Devices
+                  </h3>
+                  <p className="text-xs text-[#6C7A72] mt-0.5">Mobile vs Desktop usage</p>
+
+                  <div className="mt-8 space-y-5">
+                    {devices.map((d, idx) => {
+                      const pct = totalViews > 0 ? Math.round((d.count / totalViews) * 100) : 0;
+                      const isMob = d.device.toLowerCase().includes('mobile');
+                      return (
+                        <div key={idx} className="p-4 rounded-2xl bg-[#F4F6F2] border border-black/[0.04]">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-bold flex items-center gap-2">
+                              {isMob ? <Smartphone className="w-4 h-4 text-emerald-600" /> : <Laptop className="w-4 h-4 text-blue-600" />}
+                              {d.device}
+                            </span>
+                            <span className="font-mono text-xs font-bold text-[#0A241B]">
+                              {d.count} ({pct}%)
+                            </span>
+                          </div>
+                          <div className="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
+                            <div 
+                              className={`h-full rounded-full ${isMob ? 'bg-emerald-500' : 'bg-blue-500'}`}
+                              style={{ width: `${Math.max(5, pct)}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {devices.length === 0 && (
+                      <p className="text-xs text-[#6C7A72] py-4 text-center">No device stats logged yet</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-[#E3F9ED] text-[#0A5734] border border-[#BCE8D3] text-xs font-semibold mt-4">
+                  💡 Tip: Over 70% of candidate visitors apply from mobile via Facebook links.
+                </div>
+              </div>
+            </div>
+
+            {/* Geographic Distribution (Top Countries) */}
+            <div className="bg-white p-6 rounded-3xl border border-black/[0.08] shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-base font-extrabold text-[#17261F] flex items-center gap-2">
+                    <Globe className="w-4 h-4 text-[#00DF81]" />
+                    Geographic Breakdown (Top Countries)
+                  </h3>
+                  <p className="text-xs text-[#6C7A72] mt-0.5">Country locations of candidates visiting your site</p>
+                </div>
+              </div>
+
+              {topCountries.length === 0 ? (
+                <div className="py-8 text-center text-[#6C7A72] text-xs">
+                  Geographic data gathering in progress...
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+                  {topCountries.map((c, idx) => (
+                    <div key={idx} className="p-4 rounded-2xl bg-[#F4F6F2] border border-black/[0.05] flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-bold text-[#17261F] block">{c.country}</span>
+                        <span className="text-[11px] text-[#6C7A72]">
+                          {totalViews > 0 ? Math.round((c.count / totalViews) * 100) : 0}% of traffic
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-lg font-black text-[#0A241B] font-mono">{c.count}</span>
+                        <span className="text-[10px] text-[#6C7A72] block">visits</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ============================================================== */}
+        {/* TAB 2: CANDIDATE CV SUBMISSIONS (کون کون فارم فل کر رہا ہے)     */}
+        {/* ============================================================== */}
+        {activeTab === 'candidates' && (
+          <div className="space-y-6 animate-fadeIn">
+            
+            {/* Search and Filter Bar */}
+            <div className="bg-white p-5 rounded-3xl border border-black/[0.08] shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="relative w-full sm:w-96">
+                <Search className="w-4 h-4 text-[#8C9B92] absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="Search listings..."
-                  value={jobSearch}
-                  onChange={(e) => setJobSearch(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 rounded-full text-xs bg-[#F4F6F2] border border-black/[0.05] text-[#17261F] placeholder-[#8C9B92] focus:outline-none focus:border-[#00DF81]"
+                  placeholder="Search by name, degree, or skill (e.g. BSCS, Python)..."
+                  value={candidateSearch}
+                  onChange={(e) => setCandidateSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-[#F4F6F2] border border-black/[0.06] text-xs font-semibold text-[#17261F] placeholder-[#8C9B92] focus:outline-none focus:border-[#00DF81]"
                 />
               </div>
-            </div>
-          </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-black/[0.06] text-[#8C9B92] font-mono uppercase text-[10px]">
-                  <th className="py-3 px-3">Role / Company</th>
-                  <th className="py-3 px-3">Location & Type</th>
-                  <th className="py-3 px-3">Category</th>
-                  <th className="py-3 px-3">Source API</th>
-                  <th className="py-3 px-3 text-center">Featured</th>
-                  <th className="py-3 px-3 text-center">Views / Clicks</th>
-                  <th className="py-3 px-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-black/[0.04]">
-                {jobsLoading ? (
-                  <tr>
-                    <td colSpan="7" className="py-8 text-center text-[#8C9B92]">
-                      Loading verified jobs...
-                    </td>
-                  </tr>
-                ) : jobs.length === 0 ? (
-                  <tr>
-                    <td colSpan="7" className="py-8 text-center text-[#8C9B92]">
-                      No listings found.
-                    </td>
-                  </tr>
-                ) : (
-                  jobs.map((j) => (
-                    <tr key={j.id} className="hover:bg-[#F9FAF8] transition-colors group">
-                      <td className="py-3.5 px-3">
-                        <div className="font-bold text-[#17261F] group-hover:text-[#0A5734] transition-colors line-clamp-1 max-w-xs">
-                          {j.title}
-                        </div>
-                        <div className="text-[11px] text-[#6C7A72]">{j.company_name}</div>
-                      </td>
-                      <td className="py-3.5 px-3">
-                        <div className="text-[#3D4D43] truncate max-w-[140px]">{j.location}</div>
-                        <div className="text-[10px] text-[#0A5734] font-semibold">{j.job_type}</div>
-                      </td>
-                      <td className="py-3.5 px-3">
-                        <span className="px-2.5 py-0.5 rounded-full bg-[#E3F9ED] text-[#0A5734] border border-[#BDEFD4] text-[10px] font-semibold">
-                          {j.category}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-3 font-mono text-[#6C7A72] text-[11px]">
-                        {j.source_api}
-                      </td>
-                      <td className="py-3.5 px-3 text-center">
-                        <button
-                          onClick={() => handleToggleFeature(j.id)}
-                          className={`p-1.5 rounded-xl border transition-all ${
-                            j.is_featured 
-                              ? 'bg-amber-100 border-amber-300 text-amber-600' 
-                              : 'bg-slate-100 border-black/[0.05] text-slate-400 hover:text-amber-500'
-                          }`}
-                          title="Toggle featured"
+              <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+                <span className="text-xs font-mono font-bold text-[#0A5734] px-3 py-1.5 rounded-2xl bg-[#E3F9ED] border border-[#BCE8D3]">
+                  {candidateTotal} Registered Candidates
+                </span>
+                <button
+                  onClick={loadCandidates}
+                  className="p-2.5 rounded-2xl bg-[#F4F6F2] hover:bg-slate-200 text-[#17261F] transition-all"
+                  title="Reload Candidates"
+                >
+                  <RefreshCw className={`w-4 h-4 ${candidatesLoading ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+            </div>
+
+            {/* Candidates Table / List */}
+            <div className="bg-white rounded-3xl border border-black/[0.08] shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b border-black/[0.06] bg-[#F9FAF8] flex items-center justify-between">
+                <h3 className="text-sm font-extrabold text-[#17261F] flex items-center gap-2">
+                  <GraduationCap className="w-4 h-4 text-[#00DF81]" />
+                  Submitted Candidate CV Profiles
+                </h3>
+                <span className="text-xs text-[#6C7A72]">
+                  Automated job alerts dispatched on every matching vacancy
+                </span>
+              </div>
+
+              {candidates.length === 0 ? (
+                <div className="py-20 text-center px-4">
+                  <GraduationCap className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                  <h4 className="text-sm font-bold text-[#17261F]">No Candidate Submissions Found</h4>
+                  <p className="text-xs text-[#6C7A72] max-w-sm mx-auto mt-1">
+                    {candidateSearch 
+                      ? 'No candidate matches the search query. Try clearing filters.' 
+                      : 'Visitors who drop their CV using the website "Drop CV" button will appear here instantly.'}
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y divide-black/[0.05] overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="bg-[#F4F6F2] text-[#57685E] font-bold">
+                        <th className="py-3 px-6">Candidate</th>
+                        <th className="py-3 px-4">Education / Degree</th>
+                        <th className="py-3 px-4">Category & Skills</th>
+                        <th className="py-3 px-4">Preference</th>
+                        <th className="py-3 px-4">Date Registered</th>
+                        <th className="py-3 px-4">Alerts Sent</th>
+                        <th className="py-3 px-6 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-black/[0.04]">
+                      {candidates.map((cand) => (
+                        <tr 
+                          key={cand.id} 
+                          className="hover:bg-[#F9FAF8] transition-colors cursor-pointer"
+                          onClick={() => setSelectedCandidate(cand)}
                         >
-                          <Star className="w-3.5 h-3.5 fill-current" />
-                        </button>
-                      </td>
-                      <td className="py-3.5 px-3 text-center font-mono">
-                        <span className="text-[#6C7A72]">{j.views_count}</span>
-                        <span className="text-slate-300"> / </span>
-                        <span className="text-[#0A5734] font-bold">{j.clicks_count}</span>
-                      </td>
-                      <td className="py-3.5 px-3 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                          {/* Name & Contact */}
+                          <td className="py-4 px-6">
+                            <div className="font-bold text-[#17261F] text-sm">{cand.full_name}</div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <a 
+                                href={`mailto:${cand.email}`} 
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-[11px] text-blue-600 hover:underline flex items-center gap-1 font-mono"
+                              >
+                                <Mail className="w-3 h-3" />
+                                {cand.email}
+                              </a>
+                              {cand.phone && (
+                                <a 
+                                  href={`https://wa.me/${cand.phone.replace(/[^0-9]/g, '')}`} 
+                                  target="_blank" 
+                                  rel="noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-[11px] text-emerald-600 hover:underline flex items-center gap-0.5 font-mono"
+                                >
+                                  <Phone className="w-3 h-3" />
+                                  WA
+                                </a>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Education */}
+                          <td className="py-4 px-4">
+                            <span className="font-semibold text-[#17261F] block">{cand.education || 'Not specified'}</span>
+                            <span className="text-[10px] text-[#6C7A72]">{cand.experience_level || 'Any level'}</span>
+                          </td>
+
+                          {/* Skills */}
+                          <td className="py-4 px-4 max-w-xs">
+                            <div className="text-[11px] font-bold text-[#0A5734] mb-1">{cand.category}</div>
+                            <div className="flex flex-wrap gap-1">
+                              {(cand.skills || []).slice(0, 4).map((skill, sIdx) => (
+                                <span key={sIdx} className="px-2 py-0.5 rounded-md bg-[#ECEEE9] text-[#2C3E34] text-[10px] font-mono">
+                                  {skill}
+                                </span>
+                              ))}
+                              {(cand.skills || []).length > 4 && (
+                                <span className="text-[10px] text-[#6C7A72]">+{cand.skills.length - 4} more</span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Preference */}
+                          <td className="py-4 px-4">
+                            <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-bold">
+                              {cand.preferred_job_type || 'Remote'}
+                            </span>
+                          </td>
+
+                          {/* Registered At */}
+                          <td className="py-4 px-4 text-[#6C7A72] font-mono text-[11px]">
+                            {cand.created_at ? cand.created_at.substring(0, 16) : 'Recently'}
+                          </td>
+
+                          {/* Alerts count */}
+                          <td className="py-4 px-4">
+                            <span className="px-2 py-0.5 rounded-full bg-[#E3F9ED] text-[#0A5734] text-[11px] font-mono font-bold">
+                              {cand.alerts_count || 0} sent
+                            </span>
+                          </td>
+
+                          {/* Actions */}
+                          <td className="py-4 px-6 text-right">
+                            <button
+                              onClick={(e) => handleDeleteCandidate(cand.id, e)}
+                              className="p-2 rounded-xl text-red-500 hover:bg-red-50 transition-colors"
+                              title="Delete Candidate Record"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Candidate Details Modal (If clicked) */}
+            {selectedCandidate && (
+              <div 
+                className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn"
+                onClick={() => setSelectedCandidate(null)}
+              >
+                <div 
+                  className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-black/[0.08] shadow-2xl space-y-4"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between pb-3 border-b border-black/[0.06]">
+                    <div>
+                      <h3 className="text-lg font-black text-[#17261F]">{selectedCandidate.full_name}</h3>
+                      <p className="text-xs text-[#6C7A72]">Candidate CV Submission Details</p>
+                    </div>
+                    <button 
+                      onClick={() => setSelectedCandidate(null)}
+                      className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs"
+                    >
+                      Close
+                    </button>
+                  </div>
+
+                  <div className="space-y-3 text-xs">
+                    <div>
+                      <span className="text-[#6C7A72] block font-semibold mb-0.5">Contact Information</span>
+                      <p className="font-bold text-[#17261F]">{selectedCandidate.email}</p>
+                      {selectedCandidate.phone && (
+                        <p className="text-emerald-700 font-mono mt-0.5">Phone/WA: {selectedCandidate.phone}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <span className="text-[#6C7A72] block font-semibold mb-0.5">Education / Degree</span>
+                      <p className="font-bold text-[#17261F]">{selectedCandidate.education}</p>
+                    </div>
+
+                    <div>
+                      <span className="text-[#6C7A72] block font-semibold mb-0.5">Field & Experience Level</span>
+                      <p className="font-bold text-[#17261F]">{selectedCandidate.category} • {selectedCandidate.experience_level}</p>
+                    </div>
+
+                    <div>
+                      <span className="text-[#6C7A72] block font-semibold mb-1">Key Skills</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(selectedCandidate.skills || []).map((sk, i) => (
+                          <span key={i} className="px-2.5 py-1 rounded-lg bg-[#E3F9ED] text-[#0A5734] font-mono font-bold text-[11px]">
+                            {sk}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {selectedCandidate.resume_text && (
+                      <div>
+                        <span className="text-[#6C7A72] block font-semibold mb-1">CV / Experience Note</span>
+                        <div className="p-3 rounded-xl bg-[#F4F6F2] text-[#17261F] font-mono text-[11px] whitespace-pre-wrap max-h-40 overflow-y-auto">
+                          {selectedCandidate.resume_text}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-4 border-t border-black/[0.06] flex items-center justify-between">
+                    <span className="text-[11px] text-[#6C7A72]">
+                      Registered: {selectedCandidate.created_at}
+                    </span>
+                    <a
+                      href={`mailto:${selectedCandidate.email}?subject=Job%20Opportunity%20from%20GlobalHire%20AI`}
+                      className="px-4 py-2 rounded-xl bg-[#0A241B] text-[#00DF81] font-bold text-xs flex items-center gap-1.5"
+                    >
+                      <Mail className="w-3.5 h-3.5" />
+                      Email Candidate
+                    </a>
+                  </div>
+                </div>
+              </div>
+            )}
+
+          </div>
+        )}
+
+        {/* ============================================================== */}
+        {/* TAB 3: JOB RADAR & WORKER SYNC                                */}
+        {/* ============================================================== */}
+        {activeTab === 'jobs' && (
+          <div className="space-y-6 animate-fadeIn">
+            
+            {/* Sync Command Header Card */}
+            <div className="bg-[#0A241B] text-white p-6 rounded-3xl shadow-lg border border-black/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#00DF81] animate-pulse"></span>
+                  <h3 className="text-base font-extrabold text-white">Auto-Pilot Job Aggregator & Facebook Poster</h3>
+                </div>
+                <p className="text-xs text-slate-300 mt-1 max-w-xl">
+                  Aggregating 24/7 from Remotive, Arbeitnow, Jobicy, and Himalayas. Posting high-CTR 4:5 hiring flyers to Facebook page Global Pulse AI automatically.
+                </p>
+                {syncMsg && (
+                  <p className="text-xs font-mono text-[#00DF81] mt-2 font-bold">{syncMsg}</p>
+                )}
+              </div>
+
+              <button
+                onClick={handleSyncWorker}
+                disabled={syncing}
+                className="px-5 py-3 rounded-2xl bg-[#00DF81] hover:bg-[#2EF8A0] text-[#0A241B] font-extrabold text-xs transition-all flex items-center gap-2 shadow-lg disabled:opacity-50 shrink-0"
+              >
+                <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+                <span>{syncing ? 'Syncing...' : 'Sync Now (Scrape & Post)'}</span>
+              </button>
+            </div>
+
+            {/* Jobs Filter and List */}
+            <div className="bg-white p-5 rounded-3xl border border-black/[0.08] shadow-sm flex items-center justify-between gap-4">
+              <div className="relative w-full sm:w-80">
+                <Search className="w-4 h-4 text-[#8C9B92] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Filter active jobs by title or company..."
+                  value={jobSearch}
+                  onChange={(e) => setJobSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 rounded-2xl bg-[#F4F6F2] border border-black/[0.06] text-xs font-semibold text-[#17261F] placeholder-[#8C9B92] focus:outline-none focus:border-[#00DF81]"
+                />
+              </div>
+
+              <span className="text-xs font-mono font-bold text-[#0A5734] px-3 py-1.5 rounded-2xl bg-[#E3F9ED] border border-[#BCE8D3]">
+                {jobTotal} Active Openings
+              </span>
+            </div>
+
+            {/* Jobs Table */}
+            <div className="bg-white rounded-3xl border border-black/[0.08] shadow-sm overflow-hidden">
+              <div className="divide-y divide-black/[0.04] overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="bg-[#F4F6F2] text-[#57685E] font-bold">
+                      <th className="py-3 px-6">Role & Company</th>
+                      <th className="py-3 px-4">Category</th>
+                      <th className="py-3 px-4">Location</th>
+                      <th className="py-3 px-4">Salary</th>
+                      <th className="py-3 px-4">Apply Clicks</th>
+                      <th className="py-3 px-6 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-black/[0.04]">
+                    {jobs.map((j) => (
+                      <tr key={j.id} className="hover:bg-[#F9FAF8] transition-colors">
+                        <td className="py-3.5 px-6">
+                          <div className="font-bold text-[#17261F]">{j.title}</div>
+                          <div className="text-[11px] text-[#6C7A72]">{j.company}</div>
+                        </td>
+                        <td className="py-3.5 px-4 font-semibold text-[#0A5734]">{j.category}</td>
+                        <td className="py-3.5 px-4 text-[#6C7A72]">{j.location || 'Remote'}</td>
+                        <td className="py-3.5 px-4 font-mono font-semibold text-[#17261F]">
+                          {j.salary || 'Competitive'}
+                        </td>
+                        <td className="py-3.5 px-4 font-mono font-bold text-[#0A241B]">
+                          {j.apply_clicks || 0}
+                        </td>
+                        <td className="py-3.5 px-6 text-right space-x-2">
                           <button
-                            onClick={() => setSelectedPlaycardJob(j)}
-                            className="p-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#1877F2] transition-colors"
-                            title="Generate Facebook Playcard & Auto-Post"
+                            onClick={() => handleToggleFeatured(j.id)}
+                            className={`px-2.5 py-1 rounded-xl text-[10px] font-bold transition-all ${
+                              j.featured 
+                                ? 'bg-[#00DF81] text-[#0A241B]' 
+                                : 'bg-[#ECEEE9] text-[#6C7A72] hover:bg-slate-200'
+                            }`}
                           >
-                            <Share2 className="w-3.5 h-3.5" />
+                            {j.featured ? 'Featured' : 'Feature'}
                           </button>
                           <button
-                            onClick={() => onSelectJob(j)}
-                            className="p-1.5 rounded-xl bg-slate-100 hover:bg-[#E3F9ED] text-slate-600 hover:text-[#0A5734] transition-colors"
-                            title="Inspect details"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                          </button>
-                          <a
-                            href={j.apply_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-1.5 rounded-xl bg-slate-100 hover:bg-[#E3F9ED] text-slate-600 hover:text-[#0A5734] transition-colors"
-                            title="Apply page"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          </a>
-                          <button
-                            onClick={() => handleDelete(j.id)}
-                            className="p-1.5 rounded-xl bg-slate-100 hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
-                            title="Delete listing"
+                            onClick={() => handleDeleteJob(j.id)}
+                            className="p-1.5 rounded-lg text-red-500 hover:bg-red-50"
+                            title="Delete Job"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
           </div>
-        </div>
+        )}
 
       </main>
-
-      {/* Facebook & Social Playcard Modal */}
-      {selectedPlaycardJob && (
-        <PlaycardModal
-          job={selectedPlaycardJob}
-          onClose={() => setSelectedPlaycardJob(null)}
-        />
-      )}
-
     </div>
   );
 }

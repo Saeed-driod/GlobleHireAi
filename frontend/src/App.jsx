@@ -8,7 +8,7 @@ import PostJobModal from './components/PostJobModal';
 import AdminLoginModal from './components/AdminLoginModal';
 import CandidateModal from './components/CandidateModal';
 import AdSlot from './components/AdSlot';
-import { fetchJobs } from './api';
+import { fetchJobs, trackPageVisit } from './api';
 import { 
   Sparkles, Filter, ChevronLeft, ChevronRight, Briefcase, 
   Layers, Globe, CheckCircle2, RefreshCw, Cpu, Lock
@@ -37,14 +37,18 @@ export default function App() {
   const [postModalOpen, setPostModalOpen] = useState(false);
   const [candidateModalOpen, setCandidateModalOpen] = useState(false);
 
-  // Check URL hash & session on mount
+  // Check URL hash & session on mount + track visitor
   useEffect(() => {
+    trackPageVisit();
+
     const isAuth = sessionStorage.getItem('globalhire_admin_auth') === 'true';
     setIsAdmin(isAuth);
 
     const checkHash = () => {
-      if (window.location.hash === '#admin' || window.location.pathname === '/admin') {
-        if (isAuth) {
+      const hash = window.location.hash;
+      const path = window.location.pathname;
+      if (hash === '#admin' || hash === '#saeed-admin' || path === '/admin') {
+        if (sessionStorage.getItem('globalhire_admin_auth') === 'true') {
           setView('admin');
         } else {
           setAdminModalOpen(true);
@@ -379,22 +383,6 @@ export default function App() {
             <a href="http://150.136.214.192/api/sitemap" target="_blank" rel="noopener noreferrer" className="hover:text-[#0A241B] underline">
               Sitemap
             </a>
-            <span>•</span>
-            {/* Discreet Admin Portal Entry */}
-            <button 
-              onClick={() => {
-                if (isAdmin) {
-                  setView('admin');
-                } else {
-                  setAdminModalOpen(true);
-                }
-              }} 
-              className="hover:text-[#0A241B] flex items-center gap-1 text-[#8C9B92] hover:text-[#17261F]"
-              title="Admin Access Only"
-            >
-              <Lock className="w-3 h-3" />
-              <span>Admin Portal</span>
-            </button>
           </div>
         </div>
       </footer>

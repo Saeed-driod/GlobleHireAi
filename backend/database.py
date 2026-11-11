@@ -100,6 +100,20 @@ def init_db():
         );
 
         CREATE UNIQUE INDEX IF NOT EXISTS idx_cand_job ON candidate_alert_logs(candidate_id, job_id);
+
+        CREATE TABLE IF NOT EXISTS visitor_traffic_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ip TEXT DEFAULT 'Anonymous',
+            country TEXT DEFAULT 'Worldwide',
+            referrer TEXT DEFAULT 'Direct',
+            device TEXT DEFAULT 'Desktop',
+            page_url TEXT DEFAULT '/',
+            visited_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_traffic_visited_at ON visitor_traffic_logs(visited_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_traffic_country ON visitor_traffic_logs(country);
+        CREATE INDEX IF NOT EXISTS idx_traffic_referrer ON visitor_traffic_logs(referrer);
         """)
 
         try:
@@ -671,5 +685,164 @@ def get_talent_pool_stats() -> Dict[str, Any]:
         "total_alerts_sent": alerts_sent,
         "education_breakdown": edu_rows
     }
+
+def get_candidates_list(page: int = 1, limit: int = 50, q: str = "") -> Dict[str, Any]:
+    """Returns paginated candidate CV registrations with search."""
+    conn = get_db()
+    cursor = conn.cursor()
+    offset = (page - 1) * limit
+
+    where = "WHERE is_active = 1"
+    params = []
+    if q:
+        where += " AND (full_name LIKE ? OR email LIKE ? OR education LIKE ? OR skills LIKE ?)"
+        q_term = f"%{q}%"
+        params.extend([q_term, q_term, q_term, q_term])
+
+    cursor.execute(f"SELECT COUNT(*) as total FROM candidate_alerts {where}", params)
+    total = cursor.fetchone()["total"]
+
+    cursor.execute(f"""
+        SELECT c.*, 
+          (SELECT COUNT(*) FROM candidate_alert_logs l WHERE l.candidate_id = c.id) as alerts_count
+        FROM candidate_alerts c
+        {where}
+        ORDER BY created_at DESC
+        LIMIT ? OFFSET ?
+    """, params + [limit, offset])
+    
+    rows = cursor.fetchall()
+    candidates = []
+    for r in rows:
+        cand = dict(r)
+        try:
+            cand["skills"] = json.loads(cand.get("skills", "[]"))
+        except Exception:
+            cand["skills"] = []
+        candidates.append(cand)
+
+    conn.close()
+    return {
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "candidates": candidates
+    }
+
+def delete_candidate(cand_id: int) -> bool:
+    conn = get_db()
+    with conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM candidate_alerts WHERE id = ?", (cand_id,))
+        deleted = cursor.rowcount > 0
+    conn.close()
+    return deleted
+
+# -------------------------------------------------------------
+# REAL-TIME TRAFFIC & ORIGIN ANALYTICS
+# -------------------------------------------------------------
+
+def log_visitor_traffic(ip: str = "Anonymous", country: str = "Worldwide", referrer: str = "Direct", device: str = "Desktop", page_url: str = "/"):
+    """Logs visitor traffic session with origin details."""
+    conn = get_db()
+    # Normalize referrer
+    ref = referrer.lower().strip()
+    clean_ref = "Direct"
+    if "facebook" in ref or "fb.com" in ref:
+        clean_ref = "Facebook"
+    elif "google" in ref:
+        clean_ref = "Google Search"
+    elif "whatsapp" in ref:
+        clean_ref = "WhatsApp"
+    elif "t.co" in ref or "twitter" in ref or "x.com" in ref:
+        clean_ref = "Twitter / X"
+    elif "linkedin" in ref:
+        clean_ref = "LinkedIn"
+    elif "instagram" in ref:
+        clean_ref = "Instagram"
+    elif ref and ref != "direct" and not ref.startswith("http://localhost") and not ref.startswith("http://150.136"):
+        clean_ref = ref[:30]
+
+    try:
+        with conn:
+            conn.execute("""
+                INSERT INTO visitor_traffic_logs (ip, country, referrer, device, page_url)
+                VALUES (?, ?, ?, ?, ?)
+            """, (ip, country, clean_ref, device, page_url))
+    except Exception:
+        pass
+    finally:
+        conn.close()
+
+def get_traffic_analytics() -> Dict[str, Any]:
+    """Returns comprehensive visitor stats, country origin, and referrer breakdown."""
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Total Pageviews & Today's Visitors
+    cursor.execute("SELECT COUNT(*) as total FROM visitor_traffic_logs")
+    total_views = cursor.fetchone()["total"]
+
+    cursor.execute("""
+        SELECT COUNT(*) as today 
+        FROM visitor_traffic_logs 
+        WHERE visited_at >= datetime('now', '-1 day')
+    """)
+    views_today = cursor.fetchone()["today"]
+
+    # Unique IP Count
+    cursor.execute("SELECT COUNT(DISTINCT ip) as unique_ips FROM visitor_traffic_logs")
+    unique_visitors = cursor.fetchone()["unique_ips"]
+
+    # Referrer Traffic Breakdown
+    cursor.execute("""
+        SELECT referrer, COUNT(*) as count 
+        FROM visitor_traffic_logs 
+        GROUP BY referrer 
+        ORDER BY count DESC 
+        LIMIT 6
+    """)
+    referrers = [dict(r) for r in cursor.fetchall()]
+
+    # Country Breakdown
+    cursor.execute("""
+        SELECT country, COUNT(*) as count 
+        FROM visitor_traffic_logs 
+        WHERE country IS NOT NULL AND country != ''
+        GROUP BY country 
+        ORDER BY count DESC 
+        LIMIT 6
+    """)
+    countries = [dict(r) for r in cursor.fetchall()]
+
+    # Device Breakdown
+    cursor.execute("""
+        SELECT device, COUNT(*) as count 
+        FROM visitor_traffic_logs 
+        GROUP BY device
+    """)
+    devices = [dict(r) for r in cursor.fetchall()]
+
+    # Last 7 Days Daily History
+    cursor.execute("""
+        SELECT strftime('%Y-%m-%d', visited_at) as day, COUNT(*) as count
+        FROM visitor_traffic_logs
+        WHERE visited_at >= datetime('now', '-7 days')
+        GROUP BY day
+        ORDER BY day ASC
+    """)
+    daily_history = [dict(r) for r in cursor.fetchall()]
+
+    conn.close()
+    return {
+        "total_pageviews": total_views,
+        "views_today": views_today,
+        "unique_visitors": unique_visitors,
+        "top_referrers": referrers,
+        "top_countries": countries,
+        "devices": devices,
+        "daily_history": daily_history
+    }
+
 
 

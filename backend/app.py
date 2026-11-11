@@ -22,7 +22,11 @@ from database import (
     save_candidate_alert,
     get_talent_pool_stats,
     find_matching_candidates_for_job,
-    log_candidate_alert_sent
+    log_candidate_alert_sent,
+    get_candidates_list,
+    delete_candidate,
+    log_visitor_traffic,
+    get_traffic_analytics
 )
 from job_worker import run_sync_cycle
 from email_notifier import send_job_match_email
@@ -350,6 +354,42 @@ def subscribe_candidate(payload: CandidateSubscribeRequest, bg_tasks: Background
 @app.get("/api/candidate/stats")
 def get_candidate_stats_route():
     return get_talent_pool_stats()
+
+class VisitTrackRequest(BaseModel):
+    referrer: Optional[str] = "Direct"
+    device: Optional[str] = "Desktop"
+    page_url: Optional[str] = "/"
+    country: Optional[str] = None
+
+@app.post("/api/track/visit")
+def track_visitor_visit(req: Request, payload: Optional[VisitTrackRequest] = None):
+    try:
+        ip = req.headers.get("x-forwarded-for") or (req.client.host if req.client else "Anonymous")
+        if ip and "," in ip:
+            ip = ip.split(",")[0].strip()
+        country = (payload.country if payload else None) or req.headers.get("cf-ipcountry") or req.headers.get("x-country") or "Worldwide"
+        ref = (payload.referrer if payload and payload.referrer else req.headers.get("referer", "Direct"))
+        dev = payload.device if payload and payload.device else "Desktop"
+        page = payload.page_url if payload and payload.page_url else "/"
+        log_visitor_traffic(ip=ip, country=country, referrer=ref, device=dev, page_url=page)
+        return {"status": "ok"}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
+
+@app.get("/api/dashboard/traffic")
+def get_traffic_route():
+    return get_traffic_analytics()
+
+@app.get("/api/candidates")
+def list_candidates_route(page: int = 1, limit: int = 50, q: str = ""):
+    return get_candidates_list(page=page, limit=limit, q=q)
+
+@app.delete("/api/candidates/{candidate_id}")
+def delete_candidate_route(candidate_id: int):
+    success = delete_candidate(candidate_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    return {"status": "deleted", "candidate_id": candidate_id}
 
 if __name__ == "__main__":
     import uvicorn

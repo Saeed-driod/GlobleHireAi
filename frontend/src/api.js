@@ -110,4 +110,41 @@ export async function fetchCandidateStats() {
   return res.json();
 }
 
+export async function trackPageVisit() {
+  try {
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    await fetch(`${API_BASE}/api/track/visit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        referrer: document.referrer || 'Direct',
+        device: isMobile ? 'Mobile' : 'Desktop',
+        page_url: window.location.pathname + window.location.search
+      })
+    });
+  } catch (e) {}
+}
+
+export async function fetchTrafficAnalytics() {
+  const res = await fetch(`${API_BASE}/api/dashboard/traffic`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to fetch traffic analytics`);
+  return res.json();
+}
+
+export async function fetchCandidates({ page = 1, limit = 50, q = '' } = {}) {
+  const params = new URLSearchParams({ page, limit });
+  if (q) params.set('q', q);
+  const res = await fetch(`${API_BASE}/api/candidates?${params.toString()}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to fetch candidates`);
+  return res.json();
+}
+
+export async function deleteCandidate(candidateId) {
+  const res = await fetch(`${API_BASE}/api/candidates/${candidateId}`, {
+    method: 'DELETE'
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to delete candidate`);
+  return res.json();
+}
+
 
