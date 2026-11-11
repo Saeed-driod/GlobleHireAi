@@ -170,13 +170,11 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#ECEEE9] text-[#17261F] flex flex-col font-sans">
       
-      {/* 100% User-Facing Clean Navbar (No Dashboard button!) */}
+      {/* 100% User-Facing Clean Navbar (Zero admin buttons) */}
       <Navbar
         onOpenPostModal={() => setPostModalOpen(true)}
         onOpenCandidateModal={() => setCandidateModalOpen(true)}
         totalJobs={total || 143}
-        isAdmin={isAdmin}
-        onGoToAdmin={() => setView('admin')}
       />
 
       {/* Hero Section with Live Search */}
