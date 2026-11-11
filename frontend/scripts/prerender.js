@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DIST_DIR = path.resolve(__dirname, '../dist');
+const PUBLIC_DIR = path.resolve(__dirname, '../public');
 const API_BASE = 'http://150.136.214.192';
 const SITE_URL = 'https://globalhireai.vercel.app';
 
@@ -30,6 +31,24 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
+function formatSeoTitle(jobTitle, companyName) {
+  const cleanTitle = (jobTitle || 'Remote Role').trim();
+  const cleanCompany = (companyName || 'Company').trim();
+  const brand = 'GlobalHire AI';
+
+  // Format 1: "Job Title at Company | GlobalHire AI"
+  const full = `${cleanTitle} at ${cleanCompany} | ${brand}`;
+  if (full.length <= 58) return full;
+
+  // Format 2: "Job Title at Company"
+  const mid = `${cleanTitle} at ${cleanCompany}`;
+  if (mid.length <= 58) return mid;
+
+  // Format 3: Truncate title gracefully before "at Company"
+  const maxTitleLen = Math.max(20, 54 - cleanCompany.length);
+  return `${cleanTitle.slice(0, maxTitleLen).trim()}... at ${cleanCompany}`;
+}
+
 async function run() {
   console.log('🚀 Starting SEO Prerendering...');
 
@@ -44,7 +63,9 @@ async function run() {
   let jobs = [];
   try {
     for (let page = 1; page <= 5; page++) {
-      const res = await fetch(`${API_BASE}/api/jobs?page=${page}&limit=100`);
+      const res = await fetch(`${API_BASE}/api/jobs?page=${page}&limit=100`, {
+        headers: { 'Accept': 'application/json' }
+      });
       if (res.ok) {
         const data = await res.json();
         const pageJobs = data.jobs || [];
@@ -130,7 +151,8 @@ async function run() {
       "directApply": true
     };
 
-    const shortTitle = `${escapeHtml(job.title)} at ${escapeHtml(job.company_name)} — GlobalHire AI`.slice(0, 58);
+    const shortTitle = formatSeoTitle(job.title, job.company_name);
+    const jobDescription = `Apply for ${escapeHtml(job.title)} at ${escapeHtml(job.company_name)}. Remote opportunity (${escapeHtml(job.location || 'Worldwide')}). Salary: ${escapeHtml(job.salary_range || 'Competitive')}. Explore verified remote tech roles on GlobalHire AI.`;
 
     const prerenderedBody = `
       <div id="root">
@@ -179,6 +201,10 @@ async function run() {
     let jobHtml = templateHtml
       .replace(/<title>.*?<\/title>/i, `<title>${shortTitle}</title>`)
       .replace(
+        /<meta name="description" content=".*?" \/>/i,
+        `<meta name="description" content="${jobDescription}" />`
+      )
+      .replace(
         /<link rel="canonical" href=".*?" \/>/i,
         `<link rel="canonical" href="${jobUrl}" />`
       )
@@ -187,8 +213,16 @@ async function run() {
         `<meta property="og:title" content="${shortTitle}" />`
       )
       .replace(
+        /<meta property="og:description" content=".*?" \/>/i,
+        `<meta property="og:description" content="${jobDescription}" />`
+      )
+      .replace(
         /<meta name="twitter:title" content=".*?" \/>/i,
         `<meta name="twitter:title" content="${shortTitle}" />`
+      )
+      .replace(
+        /<meta name="twitter:description" content=".*?" \/>/i,
+        `<meta name="twitter:description" content="${jobDescription}" />`
       )
       .replace(
         /<meta property="og:url" content=".*?" \/>/i,
@@ -276,6 +310,9 @@ ${sitemapUrls.map(u => `  <url>
 </urlset>
 `;
   fs.writeFileSync(path.join(DIST_DIR, 'sitemap.xml'), sitemapXml, 'utf8');
+  if (fs.existsSync(PUBLIC_DIR)) {
+    fs.writeFileSync(path.join(PUBLIC_DIR, 'sitemap.xml'), sitemapXml, 'utf8');
+  }
   console.log(`✓ Generated sitemap.xml with ${sitemapUrls.length} verified URLs.`);
 
   // 5. Generate /robots.txt
@@ -285,6 +322,9 @@ Allow: /
 Sitemap: ${SITE_URL}/sitemap.xml
 `;
   fs.writeFileSync(path.join(DIST_DIR, 'robots.txt'), robotsTxt, 'utf8');
+  if (fs.existsSync(PUBLIC_DIR)) {
+    fs.writeFileSync(path.join(PUBLIC_DIR, 'robots.txt'), robotsTxt, 'utf8');
+  }
   console.log('✓ Generated robots.txt pointing to sitemap.xml.');
 
   console.log('🎉 Static SEO prerendering completed successfully!');

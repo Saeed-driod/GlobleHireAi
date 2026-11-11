@@ -1,26 +1,4 @@
-# GlobalHire AI - Google Search Console & Worldwide Search Engine Directives
 User-agent: *
-Allow: /
-Disallow: /#admin
-Disallow: /admin
-Disallow: /api/dashboard
-Disallow: /api/worker
-
-User-agent: Googlebot
-Allow: /
-Allow: /api/jobs
-Allow: /api/rss
-Allow: /api/sitemap
-
-User-agent: Googlebot-News
-Allow: /
-
-User-agent: Googlebot-Image
-Allow: /api/jobs/*/playcard.png
-Allow: /og-image.png
-
-User-agent: Bingbot
 Allow: /
 
 Sitemap: https://globalhireai.vercel.app/sitemap.xml
-
