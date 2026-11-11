@@ -411,6 +411,9 @@ def run_sync_cycle() -> dict:
     # Automated Facebook Playcard Posting
     auto_post_to_facebook()
 
+    # Automated Candidate CV Email Match Alerts
+    dispatch_candidate_email_alerts()
+
     logger.info(f"=== CYCLE COMPLETED: Total Added: {total_added}, Total Updated: {total_updated} ===")
     return {
         "timestamp": datetime.utcnow().isoformat(),
@@ -438,6 +441,24 @@ def auto_post_to_facebook():
                 logger.warning(f"[Facebook Auto-Poster] Post returned: {res}")
     except Exception as e:
         logger.error(f"[Facebook Auto-Poster] Error: {e}")
+
+def dispatch_candidate_email_alerts():
+    try:
+        from database import get_jobs, find_matching_candidates_for_job, log_candidate_alert_sent
+        from email_notifier import send_job_match_email
+        recent_jobs = get_jobs(page=1, limit=10, sort="latest").get("jobs", [])
+        total_alerts = 0
+        for j in recent_jobs:
+            matching_cands = find_matching_candidates_for_job(j, limit=20)
+            for cand in matching_cands:
+                ok = send_job_match_email(cand, j)
+                if ok:
+                    log_candidate_alert_sent(cand["id"], j["id"])
+                    total_alerts += 1
+        if total_alerts > 0:
+            logger.info(f"[Candidate Alerts] Dispatched {total_alerts} job alert emails to matching candidates!")
+    except Exception as e:
+        logger.error(f"[Candidate Alerts] Error matching/dispatching emails: {e}")
 
 def main():
     parser = argparse.ArgumentParser(description="GlobalHire AI 24/7 Job Aggregator")

@@ -91,3 +91,23 @@ export function getExportCsvUrl() {
   return `${API_BASE}/api/jobs/export/csv`;
 }
 
+export async function subscribeCandidate(candidateData) {
+  const res = await fetch(`${API_BASE}/api/candidate/subscribe`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(candidateData)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `HTTP ${res.status}: Failed to submit candidate profile`);
+  }
+  return res.json();
+}
+
+export async function fetchCandidateStats() {
+  const res = await fetch(`${API_BASE}/api/candidate/stats`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to load candidate stats`);
+  return res.json();
+}
+
+

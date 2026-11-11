@@ -18,9 +18,25 @@ from database import (
     log_apply_click,
     get_dashboard_stats,
     toggle_feature_job,
-    delete_job
+    delete_job,
+    save_candidate_alert,
+    get_talent_pool_stats,
+    find_matching_candidates_for_job,
+    log_candidate_alert_sent
 )
 from job_worker import run_sync_cycle
+from email_notifier import send_job_match_email
+
+class CandidateSubscribeRequest(BaseModel):
+    full_name: str
+    email: str
+    phone: Optional[str] = ""
+    education: str
+    category: Optional[str] = "All"
+    skills: Optional[list] = []
+    experience_level: Optional[str] = "Any"
+    preferred_job_type: Optional[str] = "Remote"
+    resume_text: Optional[str] = ""
 
 class JobCreateRequest(BaseModel):
     title: str
@@ -299,6 +315,41 @@ def get_sitemap():
         return Response(content=xml, media_type="application/xml")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/candidate/subscribe")
+def subscribe_candidate(payload: CandidateSubscribeRequest, bg_tasks: BackgroundTasks):
+    try:
+        cand = save_candidate_alert(payload.dict())
+        # Find immediate matching jobs in database
+        jobs_res = get_jobs(page=1, limit=50, sort="latest")
+        matches = []
+        for j in jobs_res.get("jobs", []):
+            cand_cat = cand.get("category", "All")
+            cand_edu = (cand.get("education") or "").lower()
+            if cand_cat == "All" or cand_cat.lower() == j.get("category", "").lower():
+                matches.append(j)
+            elif any(s.lower() in (j.get("title") or "").lower() for s in payload.skills if len(s) > 2):
+                matches.append(j)
+        
+        # Dispatch instant alert email in background for top matching job
+        if matches:
+            top_match = matches[0]
+            bg_tasks.add_task(send_job_match_email, cand, top_match)
+            if cand.get("id") and top_match.get("id"):
+                log_candidate_alert_sent(cand["id"], top_match["id"])
+            
+        return {
+            "status": "success",
+            "message": "Candidate CV profile registered successfully! Automated email alerts activated.",
+            "immediate_matches_count": len(matches),
+            "top_matching_job": matches[0] if matches else None
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/candidate/stats")
+def get_candidate_stats_route():
+    return get_talent_pool_stats()
 
 if __name__ == "__main__":
     import uvicorn

@@ -6,6 +6,7 @@ import JobDetailModal from './components/JobDetailModal';
 import BentoDashboard from './components/BentoDashboard';
 import PostJobModal from './components/PostJobModal';
 import AdminLoginModal from './components/AdminLoginModal';
+import CandidateModal from './components/CandidateModal';
 import AdSlot from './components/AdSlot';
 import { fetchJobs } from './api';
 import { 
@@ -167,6 +168,7 @@ export default function App() {
       {/* 100% User-Facing Clean Navbar (No Dashboard button!) */}
       <Navbar
         onOpenPostModal={() => setPostModalOpen(true)}
+        onOpenCandidateModal={() => setCandidateModalOpen(true)}
         totalJobs={total || 143}
         isAdmin={isAdmin}
         onGoToAdmin={() => setView('admin')}
@@ -180,6 +182,7 @@ export default function App() {
         setSelectedCategory={setCategory}
         onQuickPillClick={handleQuickPill}
         activeQuickPill={activeQuickPill}
+        onOpenCandidateModal={() => setCandidateModalOpen(true)}
       />
 
       {/* Header Banner Ad Slot */}
@@ -414,6 +417,11 @@ export default function App() {
         isOpen={adminModalOpen}
         onClose={() => setAdminModalOpen(false)}
         onLoginSuccess={handleAdminSuccess}
+      />
+
+      <CandidateModal
+        isOpen={candidateModalOpen}
+        onClose={() => setCandidateModalOpen(false)}
       />
 
     </div>

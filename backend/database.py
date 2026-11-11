@@ -70,6 +70,36 @@ def init_db():
         );
 
         CREATE INDEX IF NOT EXISTS idx_sync_time ON sync_logs(timestamp DESC);
+
+        CREATE TABLE IF NOT EXISTS candidate_alerts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            full_name TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            phone TEXT,
+            education TEXT NOT NULL,
+            category TEXT NOT NULL DEFAULT 'All',
+            skills TEXT NOT NULL DEFAULT '[]',
+            experience_level TEXT DEFAULT 'Any',
+            preferred_job_type TEXT DEFAULT 'Remote',
+            resume_text TEXT,
+            is_active BOOLEAN NOT NULL DEFAULT 1,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            last_notified_at TIMESTAMP
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_candidate_email ON candidate_alerts(email);
+        CREATE INDEX IF NOT EXISTS idx_candidate_education ON candidate_alerts(education);
+        CREATE INDEX IF NOT EXISTS idx_candidate_category ON candidate_alerts(category);
+
+        CREATE TABLE IF NOT EXISTS candidate_alert_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            candidate_id INTEGER NOT NULL REFERENCES candidate_alerts(id) ON DELETE CASCADE,
+            job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+            sent_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            status TEXT NOT NULL DEFAULT 'sent'
+        );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_cand_job ON candidate_alert_logs(candidate_id, job_id);
         """)
 
         try:
@@ -484,4 +514,162 @@ def mark_job_posted_to_fb(job_id: int):
     with conn:
         conn.execute("UPDATE jobs SET posted_to_fb = 1 WHERE id = ?", (job_id,))
     conn.close()
+
+# -------------------------------------------------------------
+# CANDIDATE CV ALERT & TALENT POOL FUNCTIONS
+# -------------------------------------------------------------
+
+def save_candidate_alert(candidate_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Register or update a candidate for automated job match emails."""
+    conn = get_db()
+    cursor = conn.cursor()
+    email = str(candidate_data.get("email", "")).strip().lower()
+    full_name = str(candidate_data.get("full_name", "")).strip()
+    education = str(candidate_data.get("education", "Bachelors")).strip()
+    category = str(candidate_data.get("category", "All")).strip()
+    phone = str(candidate_data.get("phone", "")).strip()
+    exp = str(candidate_data.get("experience_level", "Any")).strip()
+    job_type = str(candidate_data.get("preferred_job_type", "Remote")).strip()
+    resume_text = str(candidate_data.get("resume_text", "")).strip()
+    
+    skills = candidate_data.get("skills", [])
+    if isinstance(skills, str):
+        try:
+            skills = json.loads(skills)
+        except Exception:
+            skills = [s.strip() for s in skills.split(",") if s.strip()]
+    skills_json = json.dumps(skills[:20])
+
+    try:
+        with conn:
+            cursor.execute("""
+                INSERT INTO candidate_alerts (
+                    full_name, email, phone, education, category, skills,
+                    experience_level, preferred_job_type, resume_text, is_active
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+                ON CONFLICT(email) DO UPDATE SET
+                    full_name = excluded.full_name,
+                    phone = excluded.phone,
+                    education = excluded.education,
+                    category = excluded.category,
+                    skills = excluded.skills,
+                    experience_level = excluded.experience_level,
+                    preferred_job_type = excluded.preferred_job_type,
+                    resume_text = excluded.resume_text,
+                    is_active = 1
+            """, (full_name, email, phone, education, category, skills_json, exp, job_type, resume_text))
+            candidate_id = cursor.lastrowid
+            
+        cursor.execute("SELECT * FROM candidate_alerts WHERE email = ?", (email,))
+        row = cursor.fetchone()
+        conn.close()
+        return dict(row) if row else {"id": candidate_id, "email": email}
+    except Exception as e:
+        conn.close()
+        raise e
+
+def find_matching_candidates_for_job(job: Dict[str, Any], limit: int = 50) -> List[Dict[str, Any]]:
+    """Finds candidates whose category, skills or education match the given job."""
+    conn = get_db()
+    cursor = conn.cursor()
+    job_id = job.get("id")
+    category = job.get("category", "")
+    title = (job.get("title") or "").lower()
+    desc = (job.get("description") or "").lower()
+
+    # Find active candidates who haven't been notified of this specific job yet
+    cursor.execute("""
+        SELECT c.* FROM candidate_alerts c
+        LEFT JOIN candidate_alert_logs l ON c.id = l.candidate_id AND l.job_id = ?
+        WHERE c.is_active = 1 AND l.id IS NULL
+        LIMIT ?
+    """, (job_id, limit * 2))
+    rows = cursor.fetchall()
+    
+    matched = []
+    for r in rows:
+        cand = dict(r)
+        cand_cat = cand.get("category", "All")
+        cand_edu = (cand.get("education") or "").lower()
+        cand_skills = []
+        try:
+            cand_skills = json.loads(cand.get("skills", "[]"))
+        except Exception:
+            pass
+
+        # Matching algorithm
+        is_match = False
+        # 1. Direct Category Match
+        if cand_cat == "All" or cand_cat.lower() == category.lower():
+            is_match = True
+        
+        # 2. Skill keywords in job title/description
+        if not is_match and cand_skills:
+            for s in cand_skills:
+                s_lower = str(s).lower()
+                if len(s_lower) > 2 and (s_lower in title or s_lower in desc):
+                    is_match = True
+                    break
+
+        # 3. Education / Degree match (e.g. computer science, mba, engineering)
+        if not is_match and cand_edu:
+            edu_keywords = [w for w in cand_edu.split() if len(w) > 3]
+            for ek in edu_keywords:
+                if ek in title or ek in desc:
+                    is_match = True
+                    break
+
+        if is_match:
+            cand["skills"] = cand_skills
+            matched.append(cand)
+            if len(matched) >= limit:
+                break
+
+    conn.close()
+    return matched
+
+def log_candidate_alert_sent(candidate_id: int, job_id: int):
+    """Record that an alert was sent so candidate isn't spammed with duplicates."""
+    conn = get_db()
+    try:
+        with conn:
+            conn.execute("""
+                INSERT OR IGNORE INTO candidate_alert_logs (candidate_id, job_id)
+                VALUES (?, ?)
+            """, (candidate_id, job_id))
+            conn.execute("""
+                UPDATE candidate_alerts SET last_notified_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (candidate_id,))
+    except Exception:
+        pass
+    finally:
+        conn.close()
+
+def get_talent_pool_stats() -> Dict[str, Any]:
+    """Returns total subscribers and breakdown for admin dashboard."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) as total FROM candidate_alerts WHERE is_active = 1")
+    total = cursor.fetchone()["total"]
+
+    cursor.execute("SELECT COUNT(*) as alerts_sent FROM candidate_alert_logs")
+    alerts_sent = cursor.fetchone()["alerts_sent"]
+
+    cursor.execute("""
+        SELECT education, COUNT(*) as count 
+        FROM candidate_alerts 
+        GROUP BY education 
+        ORDER BY count DESC 
+        LIMIT 5
+    """)
+    edu_rows = [dict(r) for r in cursor.fetchall()]
+
+    conn.close()
+    return {
+        "total_candidates": total,
+        "total_alerts_sent": alerts_sent,
+        "education_breakdown": edu_rows
+    }
+
 

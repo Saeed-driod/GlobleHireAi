@@ -7,7 +7,8 @@ export default function HeroSection({
   selectedCategory,
   setSelectedCategory,
   onQuickPillClick,
-  activeQuickPill
+  activeQuickPill,
+  onOpenCandidateModal
 }) {
   const quickPills = [
     { id: 'remote', label: '🌍 Worldwide Remote', filter: { job_type: 'Remote', q: '' } },
@@ -123,6 +124,17 @@ export default function HeroSection({
               </button>
             );
           })}
+        </div>
+
+        {/* Drop CV Interactive Pill Banner */}
+        <div className="pt-2">
+          <button
+            onClick={onOpenCandidateModal}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-[#E3F9ED] via-white to-[#E3F9ED] hover:from-[#D4F4E4] hover:to-[#D4F4E4] border border-[#BCE8D3] text-xs font-bold text-[#0A5734] shadow-sm transition-all group active:scale-95"
+          >
+            <Sparkles className="w-4 h-4 text-[#00DF81] group-hover:rotate-12 transition-transform" />
+            <span>Looking for jobs in your degree? <strong className="underline text-[#0A241B]">Drop Your CV</strong> — AI will automatically email jobs matching your education!</span>
+          </button>
         </div>
 
       </div>
