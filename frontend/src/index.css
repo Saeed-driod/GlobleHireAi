@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    background-color: #ECEEE9;
+    color: #17261F;
+    min-height: 100vh;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+/* Custom smooth scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #E4E7E1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #CBD2C6;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #00DF81;
+}
+
+/* Glowing dot animation */
+@keyframes pulseMint {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 10px rgba(0, 223, 129, 0.7);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.15);
+    box-shadow: 0 0 16px rgba(0, 223, 129, 0.9);
+  }
+}
+
+.pulse-glow {
+  animation: pulseMint 2.2s infinite ease-in-out;
+}
+
+/* Card hover animation */
+.v22-card {
+  background-color: #FFFFFF;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 1.5rem;
+  box-shadow: 0 4px 20px -2px rgba(23, 38, 31, 0.04);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.v22-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 30px -4px rgba(23, 38, 31, 0.08);
+  border-color: rgba(0, 223, 129, 0.3);
+}
+
+.v22-dark-card {
+  background-color: #0A241B;
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1.5rem;
+  box-shadow: 0 10px 25px -4px rgba(10, 36, 27, 0.25);
+}

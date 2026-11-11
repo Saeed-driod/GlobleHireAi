@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+venv/
+.venv/
+
+# Environment Variables
+.env
+frontend/.env.local
+frontend/.env.*.local
+
+# Python cache & artifacts
+__pycache__/
+backend/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Local Database & logs
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+*.log
+
+# Build outputs
+# Note: dist can be ignored since Vercel builds from source with `npm run build`
+frontend/dist/
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
