@@ -35,6 +35,7 @@ export default function App() {
   // Modals
   const [selectedJobId, setSelectedJobId] = useState(null);
   const [postModalOpen, setPostModalOpen] = useState(false);
+  const [candidateModalOpen, setCandidateModalOpen] = useState(false);
 
   // Check URL hash & session on mount
   useEffect(() => {

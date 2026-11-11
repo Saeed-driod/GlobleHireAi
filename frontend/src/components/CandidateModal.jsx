@@ -315,3 +315,4 @@ export default function CandidateModal({ isOpen, onClose }) {
     </div>
   );
 }
+

@@ -137,31 +137,6 @@
     }
     </script>
 
-    <!-- ========================================================================= -->
-    <!-- 6. MONETAG AD NETWORK SCRIPTS (ACTIVE MONETIZATION)                      -->
-    <!-- ========================================================================= -->
-    <!-- Monetag MultiTag & In-Page Push -->
-    <script src="https://quge5.com/88/tag.min.js" data-zone="308627" async data-cfasync="false"></script>
-
-    <!-- Monetag Zone 12236001 -->
-    <script>(function(s){s.dataset.zone='12236001',s.src='https://al5sm.com/tag.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))</script>
-
-    <!-- Monetag Zone 12236002 -->
-    <script src="https://5gvci.com/act/files/tag.min.js?z=12236002" data-cfasync="false" async></script>
-
-    <!-- Monetag Zone 12236004 -->
-    <script>(function(s){s.dataset.zone='12236004',s.src='https://nap5k.com/tag.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))</script>
-
-    <!-- Monetag Vignette Banner (Zone 12236005) -->
-    <script>(function(s){s.dataset.zone='12236005',s.src='https://n6wxm.com/vignette.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))</script>
-
-    <script>
-      window.monetagConfig = {
-        enabled: true,
-        zones: [308627, 12236001, 12236002, 12236004, 12236005]
-      };
-    </script>
-
     <!-- Favicon & Brand Icons -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='25' fill='%230A241B'/><text y='65' x='50' font-size='50' font-weight='900' fill='%2300DF81' text-anchor='middle'>G</text></svg>" />
     <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='25' fill='%230A241B'/><text y='65' x='50' font-size='50' font-weight='900' fill='%2300DF81' text-anchor='middle'>G</text></svg>" />
@@ -174,5 +149,42 @@
   <body class="bg-[#ECEEE9] text-[#17261F] antialiased selection:bg-[#00DF81] selection:text-[#0A241B]">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+
+    <!-- ========================================================================= -->
+    <!-- 6. MONETAG AD NETWORK SCRIPTS (DEFERRED SAFE LOADER)                      -->
+    <!-- ========================================================================= -->
+    <script>
+      window.addEventListener('DOMContentLoaded', function() {
+        try {
+          var loadScript = function(src, attrs) {
+            var s = document.createElement('script');
+            s.src = src;
+            s.async = true;
+            s.setAttribute('data-cfasync', 'false');
+            if (attrs) {
+              for (var k in attrs) s.setAttribute(k, attrs[k]);
+            }
+            document.body.appendChild(s);
+          };
+
+          // Monetag MultiTag & In-Page Push
+          loadScript('https://quge5.com/88/tag.min.js', {'data-zone': '308627'});
+
+          // Monetag Zone 12236001
+          (function(s){s.dataset.zone='12236001',s.src='https://al5sm.com/tag.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')));
+
+          // Monetag Zone 12236002
+          loadScript('https://5gvci.com/act/files/tag.min.js?z=12236002');
+
+          // Monetag Zone 12236004
+          (function(s){s.dataset.zone='12236004',s.src='https://nap5k.com/tag.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')));
+
+          // Monetag Vignette Banner (Zone 12236005)
+          (function(s){s.dataset.zone='12236005',s.src='https://n6wxm.com/vignette.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')));
+        } catch (e) {
+          console.warn('Monetag deferred load:', e);
+        }
+      });
+    </script>
   </body>
 </html>
