@@ -494,6 +494,27 @@ export default function App() {
           </div>
         </div>
 
+        {/* Saved Jobs View Banner */}
+        {viewSavedOnly && (
+          <div className="mb-6 p-4 rounded-2xl bg-[#E3F9ED] dark:bg-[#00DF81]/15 border border-[#BCE8D3] dark:border-[#00DF81]/30 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Bookmark className="w-5 h-5 text-[#0A5734] dark:text-[#00DF81] fill-current" />
+              <span className="text-sm font-bold text-[#0A5734] dark:text-[#00DF81]">
+                Saved Bookmarks View ({savedJobIds.length})
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                setViewSavedOnly(false);
+                setPage(1);
+              }}
+              className="text-xs font-bold px-3.5 py-1.5 rounded-xl bg-white dark:bg-white/10 text-[#17261F] dark:text-white border border-black/[0.08] dark:border-white/10 hover:bg-slate-50 transition-all shadow-sm"
+            >
+              ← View All Remote Jobs
+            </button>
+          </div>
+        )}
+
         {/* Results Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -545,28 +566,38 @@ export default function App() {
         ) : filteredJobs.length === 0 ? (
           /* Empty State */
           <div className="py-20 text-center rounded-3xl bg-white dark:bg-[#11231C] border border-black/[0.06] dark:border-white/[0.08] p-8 shadow-sm">
-            <Briefcase className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+            {viewSavedOnly ? (
+              <Bookmark className="w-12 h-12 text-[#00DF81] mx-auto mb-4" />
+            ) : (
+              <Briefcase className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+            )}
             <h3 className="text-lg font-bold text-[#17261F] dark:text-white">
-              No jobs found matching your criteria
+              {viewSavedOnly ? 'No saved jobs yet' : 'No jobs found matching your criteria'}
             </h3>
             <p className="text-xs text-[#6C7A72] dark:text-slate-400 max-w-sm mx-auto mt-1 mb-6">
-              Try broadening your keyword, clearing active filters, or toggling off specific filters.
+              {viewSavedOnly 
+                ? 'Click the bookmark icon on any job card to save listings here for easy access.'
+                : 'Try broadening your keyword, clearing active filters, or toggling off specific filters.'}
             </p>
             <button
               onClick={() => {
-                setSearchQuery('');
-                setCategory('All');
-                setJobType('All');
-                setCountryFilter('All');
-                setSalaryFilter('All');
-                setOpenToPakistan(false);
-                setVisaSponsored(false);
-                setViewSavedOnly(false);
-                setActiveQuickPill(null);
+                if (viewSavedOnly) {
+                  setViewSavedOnly(false);
+                } else {
+                  setSearchQuery('');
+                  setCategory('All');
+                  setJobType('All');
+                  setCountryFilter('All');
+                  setSalaryFilter('All');
+                  setOpenToPakistan(false);
+                  setVisaSponsored(false);
+                  setActiveQuickPill(null);
+                }
+                setPage(1);
               }}
               className="px-5 py-2.5 rounded-2xl text-xs font-bold bg-[#0A241B] dark:bg-[#00DF81] text-[#00DF81] dark:text-[#0A241B] transition-all shadow-md"
             >
-              Reset All Filters
+              {viewSavedOnly ? '← Browse Remote Jobs' : 'Reset All Filters'}
             </button>
           </div>
         ) : (

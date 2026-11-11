@@ -106,7 +106,7 @@ export default function JobDetailModal({ jobId, onClose, onTagClick, onSelectRel
                     <h2 className="text-xl sm:text-2xl font-black text-[#17261F]">{job.title}</h2>
                     {job.is_featured ? (
                       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                        FEATURED
+                        Sponsored
                       </span>
                     ) : null}
                   </div>
@@ -136,7 +136,7 @@ export default function JobDetailModal({ jobId, onClose, onTagClick, onSelectRel
                   <span className="text-[11px] text-[#8C9B92] block font-semibold">Compensation</span>
                   <div className="flex items-center gap-1.5 mt-1 text-xs font-bold text-[#084D2E]">
                     <DollarSign className="w-3.5 h-3.5 text-[#084D2E] shrink-0" />
-                    <span className="truncate">{job.salary_range || 'Competitive'}</span>
+                    <span className="truncate">{job.salary_range && job.salary_range !== 'Competitive' ? job.salary_range : 'Salary not listed'}</span>
                   </div>
                 </div>
 
