@@ -208,8 +208,8 @@ async function run() {
       <div id="root">
         <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <header class="text-center max-w-3xl mx-auto mb-10">
-            <h1 class="text-3xl sm:text-4xl font-black text-[#17261F] tracking-tight">Worldwide Remote Tech Jobs Radar</h1>
-            <p class="text-sm text-[#57685E] mt-2">Verified openings aggregated 24/7 with transparent salaries and direct applications.</p>
+            <h1 class="text-3xl sm:text-5xl font-black text-[#17261F] tracking-tight">Find Remote Jobs You Can Do From Anywhere</h1>
+            <p class="text-sm sm:text-base text-[#57685E] mt-3">Explore ${jobs.length} worldwide remote jobs across tech, design, marketing, and support. Curated from trusted job boards with transparent salaries.</p>
           </header>
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             ${jobs.slice(0, 18).map(j => `
@@ -244,10 +244,23 @@ async function run() {
       }))
     };
 
-    const updatedHomeHtml = templateHtml.replace(
-      /<div id="root"><\/div>/i,
-      initialCardsHtml + `\n<script type="application/ld+json">${JSON.stringify(initialJobListingsJsonLd)}</script>`
-    );
+    let updatedHomeHtml = templateHtml
+      .replace(
+        /<meta name="description" content=".*?" \/>/i,
+        `<meta name="description" content="Find remote jobs you can do from anywhere. Explore ${jobs.length} active worldwide remote jobs across tech, design, and marketing. Curated from trusted job boards with transparent salaries." />`
+      )
+      .replace(
+        /<meta property="og:description" content=".*?" \/>/i,
+        `<meta property="og:description" content="Find remote jobs you can do from anywhere. Explore ${jobs.length} active worldwide remote jobs across tech, design, and marketing. Curated from trusted job boards with transparent salaries." />`
+      )
+      .replace(
+        /<meta name="twitter:description" content=".*?" \/>/i,
+        `<meta name="twitter:description" content="Find remote jobs you can do from anywhere. Explore ${jobs.length} active worldwide remote jobs across tech, design, and marketing. Curated from trusted job boards with transparent salaries." />`
+      )
+      .replace(
+        /<div id="root"><\/div>/i,
+        initialCardsHtml + `\n<script type="application/ld+json">${JSON.stringify(initialJobListingsJsonLd)}</script>`
+      );
     fs.writeFileSync(path.join(DIST_DIR, 'index.html'), updatedHomeHtml, 'utf8');
     console.log('✓ Injected initial server-rendered job listings into dist/index.html');
   }

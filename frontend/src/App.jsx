@@ -142,6 +142,19 @@ export default function App() {
     return () => window.removeEventListener('hashchange', checkHashAndRoute);
   }, []);
 
+  // Sync real job count in document title / meta description
+  useEffect(() => {
+    if (total > 0) {
+      const desc = `Find remote jobs you can do from anywhere. Explore ${total} active worldwide remote jobs across tech, design, marketing, and support. Curated from trusted job boards with transparent salaries.`;
+      const metaDesc = document.querySelector('meta[name="description"]');
+      if (metaDesc) metaDesc.setAttribute('content', desc);
+      const ogDesc = document.querySelector('meta[property="og:description"]');
+      if (ogDesc) ogDesc.setAttribute('content', desc);
+      const twDesc = document.querySelector('meta[name="twitter:description"]');
+      if (twDesc) twDesc.setAttribute('content', desc);
+    }
+  }, [total]);
+
   // Load jobs from API
   const loadJobs = async () => {
     setLoading(true);
@@ -316,7 +329,7 @@ export default function App() {
       <Navbar
         onOpenPostModal={() => setPostModalOpen(true)}
         onOpenCandidateModal={() => setCandidateModalOpen(true)}
-        totalJobs={total || 143}
+        totalJobs={total}
         darkMode={darkMode}
         onToggleDarkMode={toggleDarkMode}
         savedCount={savedJobIds.length}
@@ -335,6 +348,7 @@ export default function App() {
         onQuickPillClick={handleQuickPill}
         activeQuickPill={activeQuickPill}
         onOpenCandidateModal={() => setCandidateModalOpen(true)}
+        totalJobs={total}
       />
 
       {/* Header Banner Ad Slot (Non-intrusive Native Banner) */}
@@ -484,13 +498,13 @@ export default function App() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-xl font-black text-[#17261F] dark:text-white flex items-center gap-2">
-              <span>{viewSavedOnly ? 'Saved Bookmarked Jobs' : 'Verified Worldwide Openings'}</span>
+              <span>{viewSavedOnly ? 'Saved Bookmarked Jobs' : 'Worldwide Remote Jobs'}</span>
               <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-[#E3F9ED] dark:bg-[#00DF81]/15 text-[#0A5734] dark:text-[#00DF81] border border-[#BCE8D3] dark:border-[#00DF81]/30">
-                {viewSavedOnly ? filteredJobs.length : total} Total
+                {viewSavedOnly ? filteredJobs.length : total} Remote Jobs Available
               </span>
             </h2>
             <p className="text-xs text-[#6C7A72] dark:text-slate-400 mt-0.5">
-              Showing verified listings matching your preferences
+              Curated from trusted job boards matching your preferences
             </p>
           </div>
 
@@ -621,7 +635,7 @@ export default function App() {
           </div>
 
           <p className="max-w-md mx-auto text-[#6C7A72] dark:text-slate-400 text-[11px] leading-relaxed">
-            The autonomous worldwide tech job radar. 100% verified listings aggregated from Remotive, Arbeitnow, Jobicy, and Himalayas.
+            Curated from trusted job boards. Remote listings aggregated from Remotive, Arbeitnow, Jobicy, and Himalayas.
           </p>
 
           {/* Legal and Trust Pages Links */}

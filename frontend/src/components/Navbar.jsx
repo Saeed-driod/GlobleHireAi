@@ -4,7 +4,7 @@ import { Sparkles, PlusCircle, Sun, Moon, Bookmark } from 'lucide-react';
 export default function Navbar({ 
   onOpenPostModal, 
   onOpenCandidateModal, 
-  totalJobs = 143,
+  totalJobs = 0,
   darkMode = false,
   onToggleDarkMode,
   savedCount = 0,
@@ -42,12 +42,14 @@ export default function Navbar({
           </div>
         </a>
 
-        {/* Center Live Badge */}
-        <div className="hidden md:flex items-center gap-2 px-4 py-1.5 rounded-full bg-white dark:bg-white/5 border border-black/[0.06] dark:border-white/10 text-xs text-[#17261F] dark:text-slate-200 shadow-sm">
-          <span className="w-2 h-2 rounded-full bg-[#00DF81] pulse-glow"></span>
-          <span className="font-bold text-[#0A5734] dark:text-[#00DF81]">{totalJobs}</span>
-          <span className="text-[#6C7A72] dark:text-slate-400">Live Jobs Aggregated 24/7</span>
-        </div>
+        {/* Center Live Badge (Single Real Job Count Calculated from Actual Data) */}
+        {totalJobs > 0 && (
+          <div className="hidden md:flex items-center gap-2 px-4 py-1.5 rounded-full bg-white dark:bg-white/5 border border-black/[0.06] dark:border-white/10 text-xs text-[#17261F] dark:text-slate-200 shadow-sm">
+            <span className="w-2 h-2 rounded-full bg-[#00DF81] pulse-glow"></span>
+            <span className="font-bold text-[#0A5734] dark:text-[#00DF81]">{totalJobs}</span>
+            <span className="text-[#6C7A72] dark:text-slate-400">Remote Jobs Available</span>
+          </div>
+        )}
 
         {/* Right Actions */}
         <div className="flex items-center gap-2.5">
