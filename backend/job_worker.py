@@ -472,7 +472,7 @@ def run_sync_cycle() -> dict:
 def auto_post_to_facebook():
     try:
         from facebook_poster import post_job_to_facebook
-        unposted = get_jobs_to_post_to_fb(limit=2)
+        unposted = get_jobs_to_post_to_fb(limit=1)
         if not unposted:
             logger.info("[Facebook Auto-Poster] All current jobs are already posted.")
             return
@@ -511,7 +511,7 @@ def main():
     parser = argparse.ArgumentParser(description="GlobalHire AI 24/7 Job Aggregator")
     parser.add_argument("--once", action="store_true", help="Run once and exit immediately")
     parser.add_argument("--daemon", action="store_true", help="Run continuously in background daemon mode")
-    parser.add_argument("--interval", type=int, default=10800, help="Interval in seconds between syncs (default: 3h / 10800s)")
+    parser.add_argument("--interval", type=int, default=1800, help="Interval in seconds between syncs & Facebook posts (default: 30m / 1800s)")
     args = parser.parse_args()
 
     if args.once:
