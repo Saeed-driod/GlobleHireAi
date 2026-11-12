@@ -3,7 +3,7 @@ import os
 from PIL import Image, ImageDraw, ImageFont
 from typing import Dict, Any
 
-REF_PATH = "/home/ubuntu/ref.jpg"
+TEMPLATE_PATH = "/home/ubuntu/clean_template.png"
 ICON_GLOBE = "/home/ubuntu/icon_globe.png"
 ICON_BRIEFCASE = "/home/ubuntu/icon_briefcase.png"
 ICON_MONEY = "/home/ubuntu/icon_money.png"
@@ -44,67 +44,22 @@ def wrap_job_title(title: str, max_chars: int = 22):
         l2 = l2[:max_chars - 3] + "..."
     return [l1, l2]
 
-def create_base_canvas(width=1024, height=1024):
-    base = Image.new("RGBA", (width, height), (10, 36, 27, 255))
-    draw = ImageDraw.Draw(base)
-
-    # Top-right radial emerald glow (matching user reference image)
-    glow_x = width - 80
-    glow_y = 60
-    for r in range(500, 30, -25):
-        factor = (1.0 - r / 500.0) ** 1.5
-        alpha = int(factor * 110)
-        draw.ellipse([glow_x - r, glow_y - r, glow_x + r, glow_y + r], fill=(17, 88, 58, alpha))
-
-    # Top-left faint glow
-    for r in range(320, 30, -30):
-        factor = (1.0 - r / 320.0) ** 2
-        alpha = int(factor * 40)
-        draw.ellipse([-r // 2, -r // 2, r, r], fill=(0, 223, 129, alpha))
-
-    # Grid lines aligned to exact 51.2px
-    grid_spacing = 51.2
-    grid_color = (24, 64, 48, 120)
-    
-    curr_x = 0.0
-    while curr_x < width:
-        x_int = int(round(curr_x))
-        draw.line([(x_int, 0), (x_int, height)], fill=grid_color, width=1)
-        curr_x += grid_spacing
-
-    curr_y = 0.0
-    while curr_y < height:
-        y_int = int(round(curr_y))
-        draw.line([(0, y_int), (width, y_int)], fill=grid_color, width=1)
-        curr_y += grid_spacing
-
-    return base
-
 def generate_job_playcard(job: Dict[str, Any], width: int = 1024, height: int = 1024) -> bytes:
     """
     Generates 100% IDENTICAL replica of the user's reference image:
     1024x1024 Deep Emerald Canvas with Subtle Grid, GlobalHire AI header,
     Dual-Tone Title (White + Neon Mint), 2x2 Badges, Skill Tags,
-    and Floating White CTA Card.
+    and Floating White CTA Card with exact background matching ref.
     """
-    img = create_base_canvas(width, height)
-
-    # If reference image exists, copy the EXACT pristine header and white card footer
-    if os.path.exists(REF_PATH):
-        ref = Image.open(REF_PATH).convert("RGBA")
-        header = ref.crop((0, 0, width, 205))
-        img.paste(header, (0, 0))
-        footer = ref.crop((0, 770, width, height))
-        img.paste(footer, (0, 770))
+    if os.path.exists(TEMPLATE_PATH):
+        img = Image.open(TEMPLATE_PATH).convert("RGBA")
+    else:
+        img = Image.new("RGBA", (width, height), (10, 36, 27, 255))
 
     draw = ImageDraw.Draw(img)
     pad_x = 76
 
-    # 1. Eyebrow Tagline at y=218: "WE'RE HIRING  •  REMOTE"
-    font_eyebrow = get_font(21, bold=True)
-    draw.text((pad_x, 218), "WE'RE HIRING  •  REMOTE", fill=(0, 223, 129), font=font_eyebrow)
-
-    # 2. Main Job Title (Line 1: White, Line 2: Mint Green)
+    # 1. Main Job Title (Line 1: White, Line 2: Mint Green)
     raw_title = str(job.get("title") or "Senior Frontend Developer")
     l1, l2 = wrap_job_title(raw_title)
 
@@ -117,14 +72,14 @@ def generate_job_playcard(job: Dict[str, Any], width: int = 1024, height: int = 
     else:
         comp_y = 390
 
-    # 3. Company line: "at <Company Name>" at y=472
+    # 2. Company line: "at <Company Name>" at y=472
     comp_name = str(job.get("company_name") or "Your Company Name")
     font_at = get_font(28, bold=False)
     font_comp = get_font(28, bold=True)
     draw.text((pad_x, comp_y), "at ", fill=(165, 185, 175), font=font_at)
     draw.text((pad_x + 40, comp_y), comp_name, fill=(255, 255, 255), font=font_comp)
 
-    # 4. Badges (2x2 Grid with Exact Cropped Icons)
+    # 3. Badges (2x2 Grid with Exact Cropped Icons)
     font_badge = get_font(22, bold=True)
     badge_h = 60
     badge_r = 16
@@ -203,7 +158,7 @@ def generate_job_playcard(job: Dict[str, Any], width: int = 1024, height: int = 
         img.paste(icon_p, (b4_x + 18, r2_y + 12), icon_p)
     draw.text((b4_x + 62, r2_y + 16), b4_text, fill=(255, 255, 255), font=font_badge)
 
-    # 5. Skill Tags at y=722
+    # 4. Skill Tags at y=722
     raw_tags = job.get("tags") or []
     if isinstance(raw_tags, str):
         try:
