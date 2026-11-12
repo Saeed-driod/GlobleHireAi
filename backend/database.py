@@ -120,6 +120,23 @@ def init_db():
             conn.execute("ALTER TABLE jobs ADD COLUMN posted_to_fb BOOLEAN DEFAULT 0;")
         except Exception:
             pass
+
+        try:
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS ad_settings (
+                id INTEGER PRIMARY KEY,
+                master_enabled BOOLEAN NOT NULL DEFAULT 1,
+                monetag_global_script TEXT DEFAULT '',
+                direct_link_url TEXT DEFAULT '',
+                adsterra_header_banner TEXT DEFAULT '',
+                adsterra_infeed_banner TEXT DEFAULT '',
+                adsterra_sidebar_banner TEXT DEFAULT '',
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+            conn.execute("INSERT OR IGNORE INTO ad_settings (id, master_enabled) VALUES (1, 1);")
+        except Exception:
+            pass
     conn.close()
 
 BAD_TAG_PATTERNS = [
@@ -969,6 +986,51 @@ def get_traffic_analytics() -> Dict[str, Any]:
         "daily_history": daily_history,
         "recent_visitors": recent_visitors
     }
+
+
+def get_ad_settings() -> Dict[str, Any]:
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM ad_settings WHERE id = 1 LIMIT 1;")
+    row = cursor.fetchone()
+    if not row:
+        cursor.execute("INSERT OR IGNORE INTO ad_settings (id, master_enabled) VALUES (1, 1);")
+        conn.commit()
+        cursor.execute("SELECT * FROM ad_settings WHERE id = 1 LIMIT 1;")
+        row = cursor.fetchone()
+    res = dict(row) if row else {
+        "id": 1,
+        "master_enabled": 1,
+        "monetag_global_script": "",
+        "direct_link_url": "",
+        "adsterra_header_banner": "",
+        "adsterra_infeed_banner": "",
+        "adsterra_sidebar_banner": "",
+        "updated_at": ""
+    }
+    conn.close()
+    res["master_enabled"] = bool(res.get("master_enabled", 1))
+    return res
+
+
+def update_ad_settings(data: Dict[str, Any]) -> Dict[str, Any]:
+    conn = get_db()
+    cursor = conn.cursor()
+    fields = ["master_enabled", "monetag_global_script", "direct_link_url", "adsterra_header_banner", "adsterra_infeed_banner", "adsterra_sidebar_banner"]
+    updates = []
+    values = []
+    for f in fields:
+        if f in data and data[f] is not None:
+            updates.append(f"{f} = ?")
+            val = int(data[f]) if f == "master_enabled" else str(data[f])
+            values.append(val)
+    if updates:
+        values.append(1)
+        cursor.execute(f"UPDATE ad_settings SET {', '.join(updates)}, updated_at = CURRENT_TIMESTAMP WHERE id = ?;", values)
+        conn.commit()
+    conn.close()
+    return get_ad_settings()
+
 
 
 

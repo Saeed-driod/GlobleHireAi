@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { subscribeCandidate, logJobApply } from '../api';
+import { useDirectLink } from '../useDirectLink';
 
 const EDUCATION_OPTIONS = [
   "BS Computer Science / Software Engineering",
@@ -29,6 +30,7 @@ const CATEGORY_OPTIONS = [
 ];
 
 export default function CandidateModal({ isOpen, onClose, targetJob = null }) {
+  const { triggerDirectLink } = useDirectLink();
   const [formData, setFormData] = useState({
     full_name: '',
     email: '',
@@ -77,8 +79,8 @@ export default function CandidateModal({ isOpen, onClose, targetJob = null }) {
         setCountdown(prev => {
           if (prev <= 1) {
             clearInterval(timer);
-            // Open official apply destination
-            window.open(targetJob.apply_url, '_blank', 'noopener,noreferrer');
+            // Open official apply destination with session-capped Direct Link
+            triggerDirectLink(targetJob.apply_url);
             return 0;
           }
           return prev - 1;
@@ -149,7 +151,7 @@ export default function CandidateModal({ isOpen, onClose, targetJob = null }) {
 
   const handleManualProceed = () => {
     if (targetJob) {
-      window.open(targetJob.apply_url, '_blank', 'noopener,noreferrer');
+      triggerDirectLink(targetJob.apply_url);
     }
     onClose();
   };

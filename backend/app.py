@@ -26,7 +26,9 @@ from database import (
     get_candidates_list,
     delete_candidate,
     log_visitor_traffic,
-    get_traffic_analytics
+    get_traffic_analytics,
+    get_ad_settings,
+    update_ad_settings
 )
 from job_worker import run_sync_cycle
 from email_notifier import send_job_match_email
@@ -396,6 +398,15 @@ def delete_candidate_route(candidate_id: int):
     if not success:
         raise HTTPException(status_code=404, detail="Candidate not found")
     return {"status": "deleted", "candidate_id": candidate_id}
+
+@app.get("/api/settings/ads")
+def get_job_portal_ad_settings():
+    return get_ad_settings()
+
+@app.post("/api/settings/ads")
+async def update_job_portal_ad_settings(request: Request):
+    data = await request.json()
+    return update_ad_settings(data)
 
 if __name__ == "__main__":
     import uvicorn

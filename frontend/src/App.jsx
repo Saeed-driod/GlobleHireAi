@@ -697,7 +697,7 @@ export default function App() {
           /* Jobs Grid */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredJobs.map((job, index) => {
-              const showAd = index > 0 && index % 6 === 0;
+              const showAd = (index + 1) % 5 === 0;
               return (
                 <React.Fragment key={job.id}>
                   {showAd && (
