@@ -4,13 +4,101 @@ import math
 from typing import Dict, Any, Optional
 from PIL import Image, ImageDraw, ImageFont
 
+# High-converting category luxury themes
+THEMES = {
+    "Software Dev": {
+        "bg": (8, 18, 14),                # Deep Dark Forest
+        "accent": (0, 223, 129),          # Electric Mint
+        "accent_text": (6, 28, 18),
+        "card_bg": (16, 30, 24),
+        "card_border": (0, 223, 129, 120),
+        "glow": (0, 223, 129, 35),
+        "tag_bg": (22, 42, 34),
+        "tag_border": (0, 223, 129, 60),
+        "badge": "💻 TECH & ENGINEERING",
+        "tagline": "GLOBAL REMOTE TECH ROLE"
+    },
+    "AI / Data": {
+        "bg": (12, 10, 26),               # Deep Cyber Violet
+        "accent": (168, 85, 247),         # Electric Violet
+        "accent_text": (24, 8, 48),
+        "card_bg": (22, 18, 42),
+        "card_border": (168, 85, 247, 120),
+        "glow": (147, 51, 234, 40),
+        "tag_bg": (32, 26, 58),
+        "tag_border": (168, 85, 247, 60),
+        "badge": "🧠 AI & DATA INTELLIGENCE",
+        "tagline": "WORLDWIDE AI / ML OPENING"
+    },
+    "Design": {
+        "bg": (22, 10, 16),               # Deep Rose/Onyx
+        "accent": (251, 113, 133),        # Sunset Coral Rose
+        "accent_text": (48, 10, 22),
+        "card_bg": (34, 18, 26),
+        "card_border": (251, 113, 133, 120),
+        "glow": (244, 63, 94, 40),
+        "tag_bg": (48, 26, 36),
+        "tag_border": (251, 113, 133, 60),
+        "badge": "🎨 PRODUCT DESIGN & UX",
+        "tagline": "CREATIVE REMOTE VACANCY"
+    },
+    "Marketing": {
+        "bg": (10, 16, 26),               # Deep Executive Navy
+        "accent": (245, 158, 11),         # Radiant Amber Gold
+        "accent_text": (44, 24, 4),
+        "card_bg": (18, 26, 42),
+        "card_border": (245, 158, 11, 120),
+        "glow": (217, 119, 6, 40),
+        "tag_bg": (28, 38, 58),
+        "tag_border": (245, 158, 11, 60),
+        "badge": "📈 GROWTH & MARKETING",
+        "tagline": "HIGH-IMPACT REMOTE ROLE"
+    },
+    "DevOps / Cloud": {
+        "bg": (6, 18, 26),                # Deep Cyber Cyan
+        "accent": (6, 182, 212),          # Neon Cyan
+        "accent_text": (6, 32, 42),
+        "card_bg": (14, 30, 42),
+        "card_border": (6, 182, 212, 120),
+        "glow": (14, 165, 233, 40),
+        "tag_bg": (22, 42, 56),
+        "tag_border": (6, 182, 212, 60),
+        "badge": "☁️ CLOUD & INFRASTRUCTURE",
+        "tagline": "DEVSECOPS REMOTE OPENING"
+    },
+    "Customer Support": {
+        "bg": (10, 20, 20),               # Deep Emerald Teal
+        "accent": (20, 184, 166),         # Bright Mint Teal
+        "accent_text": (8, 36, 32),
+        "card_bg": (18, 34, 34),
+        "card_border": (20, 184, 166, 120),
+        "glow": (13, 148, 136, 40),
+        "tag_bg": (26, 46, 46),
+        "tag_border": (20, 184, 166, 60),
+        "badge": "🎧 CLIENT SUCCESS & SUPPORT",
+        "tagline": "WORLDWIDE CUSTOMER EXPERIENCE"
+    },
+    "default": {
+        "bg": (10, 16, 20),               # Sleek Dark Onyx
+        "accent": (0, 223, 129),          # Electric Mint
+        "accent_text": (6, 28, 18),
+        "card_bg": (18, 28, 34),
+        "card_border": (0, 223, 129, 120),
+        "glow": (0, 223, 129, 35),
+        "tag_bg": (26, 38, 46),
+        "tag_border": (0, 223, 129, 60),
+        "badge": "🌍 WORLDWIDE REMOTE ROLE",
+        "tagline": "CURATED INTERNATIONAL OPENING"
+    }
+}
+
 def get_font(size: int, bold: bool = False):
-    """Load high-quality bold system fonts on Linux & Windows."""
+    """Load clean bold fonts across Linux & Windows environments."""
     font_names = [
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-        "C:\\Windows\\Fonts\\arialbd.ttf" if bold else "C:\\Windows\\Fonts\\arial.ttf",
         "C:\\Windows\\Fonts\\segoeuib.ttf" if bold else "C:\\Windows\\Fonts\\segoeui.ttf",
+        "C:\\Windows\\Fonts\\arialbd.ttf" if bold else "C:\\Windows\\Fonts\\arial.ttf",
         "arial.ttf"
     ]
     for fn in font_names:
@@ -24,152 +112,242 @@ def get_font(size: int, bold: bool = False):
     except Exception:
         return None
 
+def wrap_text(text: str, max_chars_per_line: int = 30, max_lines: int = 2) -> list:
+    """Wraps title cleanly without cutting words."""
+    words = text.split()
+    lines = []
+    current_line = []
+    
+    for word in words:
+        test_line = " ".join(current_line + [word])
+        if len(test_line) <= max_chars_per_line:
+            current_line.append(word)
+        else:
+            if current_line:
+                lines.append(" ".join(current_line))
+            current_line = [word]
+            if len(lines) >= max_lines:
+                break
+    
+    if current_line and len(lines) < max_lines:
+        lines.append(" ".join(current_line))
+    
+    if len(lines) == max_lines and len(words) > len(" ".join(lines).split()):
+        if len(lines[-1]) > max_chars_per_line - 3:
+            lines[-1] = lines[-1][:max_chars_per_line - 3] + "..."
+        else:
+            lines[-1] = lines[-1] + "..."
+            
+    return lines or [text[:max_chars_per_line]]
+
 def generate_job_playcard(job: Dict[str, Any], width: int = 1080, height: int = 1350) -> bytes:
     """
-    Generates a high-converting, vibrant hiring flyer (4:5 Portrait 1080x1350)
-    modeled after professional high-CTR recruitment posters.
+    Generates a top-tier Silicon Valley style recruitment poster (4:5 Portrait: 1080x1350)
+    with dynamic category luxury color themes, glassmorphism cards, and real job tags.
     """
-    img = Image.new("RGBA", (width, height), (248, 250, 252, 255))
+    category = str(job.get("category") or "default")
+    theme = THEMES.get(category, THEMES["default"])
+
+    # 1. Base Canvas
+    img = Image.new("RGBA", (width, height), theme["bg"])
     draw = ImageDraw.Draw(img)
 
-    # 1. Top subtle sky gradient
-    for y in range(0, 380):
-        draw.line([(0, y), (width, y)], fill=(236, 246, 255, 255))
+    # 2. Ambient Corner Glows (Gradient rings for subtle depth)
+    glow_color = theme["glow"]
+    for r in range(450, 50, -30):
+        alpha = int((1 - r / 450) * glow_color[3])
+        draw.ellipse(
+            [width - r, -r // 2, width + r // 2, r],
+            fill=(glow_color[0], glow_color[1], glow_color[2], alpha)
+        )
+        draw.ellipse(
+            [-r // 2, height - r, r, height + r // 2],
+            fill=(glow_color[0], glow_color[1], glow_color[2], int(alpha * 0.7))
+        )
 
-    # 2. Top "WE ARE HIRING!" 3D Pill Badge
-    badge_w = 460
-    badge_h = 75
-    badge_x = (width - badge_w) // 2
-    badge_y = 45
+    pad_x = 75
 
-    # 3D shadow
+    # 3. Top Header: Category Pill Badge + 100% Remote Indicator
+    top_y = 65
+    badge_text = theme["badge"]
+    font_badge = get_font(20, bold=True)
+    
+    # Left Category Pill
     draw.rounded_rectangle(
-        [badge_x + 5, badge_y + 8, badge_x + badge_w + 5, badge_y + badge_h + 8],
-        radius=25, fill=(10, 45, 110, 100)
+        [pad_x, top_y, pad_x + 360, top_y + 48],
+        radius=24,
+        fill=theme["tag_bg"],
+        outline=theme["tag_border"][:3],
+        width=2
     )
-    # Royal Blue Badge
+    draw.text((pad_x + 22, top_y + 12), badge_text, fill=theme["accent"], font=font_badge)
+
+    # Right Live Indicator Pill
+    right_pill_w = 300
+    right_pill_x = width - pad_x - right_pill_w
     draw.rounded_rectangle(
-        [badge_x, badge_y, badge_x + badge_w, badge_y + badge_h],
-        radius=25, fill=(13, 82, 196, 255), outline=(255, 255, 255, 255), width=3
+        [right_pill_x, top_y, right_pill_x + right_pill_w, top_y + 48],
+        radius=24,
+        fill=(255, 255, 255, 12),
+        outline=(255, 255, 255, 30),
+        width=1
     )
-    draw.text((badge_x + 70, badge_y + 12), "WE ARE HIRING!", fill=(255, 255, 255, 255), font=get_font(40, bold=True))
+    # Mint green pulse dot
+    draw.ellipse([right_pill_x + 18, top_y + 19, right_pill_x + 30, top_y + 31], fill=(0, 223, 129, 255))
+    draw.text((right_pill_x + 40, top_y + 13), "VERIFIED REMOTE 24/7", fill=(255, 255, 255, 220), font=get_font(17, bold=True))
 
-    # Red energetic burst rays
-    draw.polygon([(badge_x + badge_w + 12, badge_y + 10), (badge_x + badge_w + 50, badge_y - 15), (badge_x + badge_w + 38, badge_y + 25)], fill=(225, 29, 72, 255))
-    draw.polygon([(badge_x + badge_w + 22, badge_y + 35), (badge_x + badge_w + 65, badge_y + 30), (badge_x + badge_w + 42, badge_y + 55)], fill=(225, 29, 72, 255))
+    # 4. Brand & Company Name
+    company_name = str(job.get("company_name", "Global Enterprise")).upper()
+    comp_y = 150
+    draw.text((pad_x, comp_y), f"HIRING COMPANY • {company_name}", fill=(160, 175, 168), font=get_font(22, bold=True))
 
-    # 3. Giant Sunny Yellow Hero Banner: "100% REMOTE WORK"
-    hero_w = 900
-    hero_h = 135
-    hero_x = (width - hero_w) // 2
-    hero_y = 145
+    # 5. Role Title (Clean large bold typography, 2 lines max)
+    raw_title = str(job.get("title", "Senior Software & AI Engineer"))
+    title_lines = wrap_text(raw_title, max_chars_per_line=28, max_lines=2)
+    
+    title_y = 195
+    font_title = get_font(52, bold=True)
+    for line in title_lines:
+        draw.text((pad_x, title_y), line, fill=(255, 255, 255, 255), font=font_title)
+        title_y += 66
 
-    # 3D Shadow
+    # Sub-location & source attribution line
+    loc = str(job.get("location") or "Worldwide Remote")
+    source = str(job.get("source_api") or "Remotive")
+    draw.text(
+        (pad_x, title_y + 5), 
+        f"📍 {loc}   •   ⚡ 100% Work From Anywhere   •   via {source}", 
+        fill=theme["accent"], 
+        font=get_font(22, bold=True)
+    )
+
+    # 6. Primary Details Glassmorphic Hero Box
+    box_y = title_y + 55
+    box_w = width - (pad_x * 2)
+    box_h = 240
+
+    # Box Shadow & Background
     draw.rounded_rectangle(
-        [hero_x + 8, hero_y + 12, hero_x + hero_w + 8, hero_y + hero_h + 12],
-        radius=32, fill=(180, 120, 0, 160)
+        [pad_x, box_y, pad_x + box_w, box_y + box_h],
+        radius=30,
+        fill=theme["card_bg"],
+        outline=theme["card_border"][:3],
+        width=2
     )
-    # Bright Yellow Banner
+
+    # Inside Hero Box: 3 Stats Columns
+    # Column 1: Salary
+    salary_str = job.get("salary_range") or "Competitive / Negotiable"
+    if salary_str == "Competitive":
+        salary_str = "Competitive (USD)"
+        
+    col_w = box_w // 3
+    col1_x = pad_x + 35
+    draw.text((col1_x, box_y + 35), "ANNUAL COMPENSATION", fill=(140, 155, 150), font=get_font(18, bold=True))
+    draw.text((col1_x, box_y + 68), salary_str[:22], fill=theme["accent"], font=get_font(34, bold=True))
+    draw.text((col1_x, box_y + 115), "Transparent International Pay", fill=(180, 195, 190), font=get_font(17, bold=False))
+
+    # Column 2: Workplace & Job Type
+    col2_x = pad_x + col_w + 35
+    job_type = str(job.get("job_type") or "Remote")
+    draw.text((col2_x, box_y + 35), "WORKPLACE MODE", fill=(140, 155, 150), font=get_font(18, bold=True))
+    draw.text((col2_x, box_y + 68), "100% Remote", fill=(255, 255, 255), font=get_font(34, bold=True))
+    draw.text((col2_x, box_y + 115), f"Flexible • {job_type}", fill=(180, 195, 190), font=get_font(17, bold=False))
+
+    # Divider lines inside box
+    draw.line([(pad_x + col_w, box_y + 30), (pad_x + col_w, box_y + box_h - 30)], fill=(255, 255, 255, 20), width=1)
+    draw.line([(pad_x + col_w * 2, box_y + 30), (pad_x + col_w * 2, box_y + box_h - 30)], fill=(255, 255, 255, 20), width=1)
+
+    # Column 3: Direct Apply Status
+    col3_x = pad_x + col_w * 2 + 35
+    draw.text((col3_x, box_y + 35), "APPLICATION STATUS", fill=(140, 155, 150), font=get_font(18, bold=True))
+    draw.text((col3_x, box_y + 68), "Urgent Hiring", fill=(255, 255, 255), font=get_font(34, bold=True))
+    draw.text((col3_x, box_y + 115), "Direct ATS Forwarding", fill=(180, 195, 190), font=get_font(17, bold=False))
+
+    # Bottom perks strip inside hero box
+    draw.line([(pad_x + 25, box_y + 165), (pad_x + box_w - 25, box_y + 165)], fill=(255, 255, 255, 25), width=1)
+    perks_text = "✨ Zero Agent Fees   •   Home Office Stipend   •   Visa Sponsorship / Relocation Supported"
+    draw.text((pad_x + 40, box_y + 185), perks_text, fill=(210, 225, 220), font=get_font(18, bold=True))
+
+    # 7. Real Tech Stack / Skills Chips (Dynamic from job.tags)
+    tags_y = box_y + box_h + 35
+    draw.text((pad_x, tags_y), "PRIMARY REQUIRED SKILLS & DOMAIN:", fill=(160, 175, 168), font=get_font(20, bold=True))
+
+    raw_tags = job.get("tags") or []
+    if isinstance(raw_tags, str):
+        try:
+            import json
+            raw_tags = json.loads(raw_tags)
+        except Exception:
+            raw_tags = [t.strip() for t in raw_tags.split(",") if t.strip()]
+            
+    # Default skills if empty
+    display_tags = [t for t in raw_tags if len(t) < 22][:5]
+    if not display_tags:
+        display_tags = ["Worldwide Remote", "Tech & AI", "Flexible Hours", "English Communication"]
+
+    chips_y = tags_y + 35
+    chip_x = pad_x
+    for tag in display_tags:
+        clean_tag = f"#{tag}"
+        tag_font = get_font(20, bold=True)
+        # Approximate width calculation
+        chip_w = max(110, len(clean_tag) * 14 + 36)
+        if chip_x + chip_w > width - pad_x:
+            break
+        draw.rounded_rectangle(
+            [chip_x, chips_y, chip_x + chip_w, chips_y + 52],
+            radius=18,
+            fill=theme["tag_bg"],
+            outline=theme["tag_border"][:3],
+            width=1
+        )
+        draw.text((chip_x + 18, chips_y + 14), clean_tag, fill=(240, 248, 245), font=tag_font)
+        chip_x += chip_w + 16
+
+    # 8. High-Converting Callout Container
+    callout_y = chips_y + 85
+    callout_h = 100
     draw.rounded_rectangle(
-        [hero_x, hero_y, hero_x + hero_w, hero_y + hero_h],
-        radius=32, fill=(255, 195, 0, 255), outline=(255, 255, 255, 255), width=4
+        [pad_x, callout_y, pad_x + box_w, callout_y + callout_h],
+        radius=24,
+        fill=(255, 255, 255, 10),
+        outline=(255, 255, 255, 25),
+        width=1
     )
-    draw.text((hero_x + 40, hero_y + 28), "100% REMOTE WORK", fill=(10, 30, 80, 255), font=get_font(70, bold=True))
+    # Checkmark icon
+    draw.text((pad_x + 28, callout_y + 24), "✓", fill=theme["accent"], font=get_font(38, bold=True))
+    draw.text((pad_x + 75, callout_y + 22), "100% Free Candidate Application • Direct ATS Redirect", fill=(255, 255, 255), font=get_font(22, bold=True))
+    draw.text((pad_x + 75, callout_y + 55), "No registration fees or agents. Tap the link below to apply directly.", fill=(160, 175, 170), font=get_font(18, bold=False))
 
-    # 4. Company & Role Intro
-    comp_name = str(job.get("company_name", "Global Enterprise")).upper()
-    role_title = str(job.get("title", "Senior Software & AI Engineer"))
-
-    intro_y = 310
-    draw.text((hero_x + 20, intro_y), f"{comp_name} is actively looking for passionate & dedicated:", fill=(55, 65, 81, 255), font=get_font(26, bold=False))
-
-    # Navy Role Card
-    role_box_y = intro_y + 45
+    # 9. Giant Ultra-Clean High-Contrast "APPLY NOW" Button
+    btn_y = callout_y + callout_h + 30
+    btn_h = 96
+    
+    # Outer glow
     draw.rounded_rectangle(
-        [hero_x, role_box_y, hero_x + hero_w, role_box_y + 115],
-        radius=26, fill=(10, 36, 85, 255), outline=(255, 195, 0, 255), width=3
+        [pad_x - 3, btn_y - 3, pad_x + box_w + 3, btn_y + btn_h + 3],
+        radius=28,
+        fill=theme["accent"]
     )
-    title_short = role_title[:32]
-    draw.text((hero_x + 35, role_box_y + 22), title_short, fill=(255, 255, 255, 255), font=get_font(42, bold=True))
-    draw.text((hero_x + 35, role_box_y + 72), "Full International Benefits • Work From Home Worldwide", fill=(0, 223, 129, 255), font=get_font(22, bold=True))
-
-    # 5. Red Ribbon: "★ JOB DETAILS & PERKS ★"
-    ribbon_w = 520
-    ribbon_h = 60
-    ribbon_x = (width - ribbon_w) // 2
-    ribbon_y = 495
-
     draw.rounded_rectangle(
-        [ribbon_x, ribbon_y, ribbon_x + ribbon_w, ribbon_y + ribbon_h],
-        radius=18, fill=(225, 29, 72, 255), outline=(255, 255, 255, 255), width=2
+        [pad_x, btn_y, pad_x + box_w, btn_y + btn_h],
+        radius=26,
+        fill=theme["accent"]
     )
-    draw.text((ribbon_x + 65, ribbon_y + 14), "★ JOB DETAILS & PERKS ★", fill=(255, 255, 255, 255), font=get_font(26, bold=True))
+    btn_text = "👉 TAP LINK IN POST TO APPLY DIRECTLY ↗"
+    draw.text((pad_x + 95, btn_y + 28), btn_text, fill=theme["accent_text"], font=get_font(32, bold=True))
 
-    # 6. Vibrant 6-Capsule Grid (2 Columns x 3 Rows)
-    grid_y = 580
-    col_w = 435
-    row_h = 85
-    col1_x = hero_x
-    col2_x = hero_x + col_w + 30
+    # 10. Bottom Premium Footer
+    foot_y = height - 120
+    draw.line([(pad_x, foot_y), (width - pad_x, foot_y)], fill=(255, 255, 255, 30), width=1)
 
-    salary_display = job.get("salary_range") or "$80k - $150k / yr"
-    loc_display = str(job.get("location", "Worldwide Remote"))[:24]
+    # Logo G badge
+    draw.rounded_rectangle([pad_x, foot_y + 20, pad_x + 48, foot_y + 68], radius=14, fill=theme["accent"])
+    draw.text((pad_x + 13, foot_y + 25), "G", fill=theme["accent_text"], font=get_font(32, bold=True))
 
-    capsules = [
-        ("Location: " + loc_display, "🌍 GLOBAL", (14, 116, 244, 255), (10, 80, 180, 255)),
-        ("Salary: " + salary_display, "💰 HIGH PAY", (16, 185, 129, 255), (10, 130, 90, 255)),
-        ("Role: " + str(job.get("category", "Software Dev"))[:20], "💻 TECH ROLE", (147, 51, 234, 255), (110, 30, 180, 255)),
-        ("Visa: Sponsorship Radar", "✈️ VISA OK", (245, 158, 11, 255), (190, 110, 0, 255)),
-        ("Type: " + str(job.get("job_type", "Full-Time")), "⚡ URGENT", (236, 72, 153, 255), (180, 40, 110, 255)),
-        ("Eligibility: Open to All", "🎓 ZERO FEE", (13, 148, 136, 255), (10, 100, 90, 255)),
-    ]
-
-    for idx, (text, badge, bg_col, bdr_col) in enumerate(capsules):
-        r = idx // 2
-        c = idx % 2
-        cx = col1_x if c == 0 else col2_x
-        cy = grid_y + (r * (row_h + 18))
-
-        draw.rounded_rectangle([cx, cy, cx + col_w, cy + row_h], radius=22, fill=bg_col, outline=bdr_col, width=2)
-        # Inner white pill badge
-        draw.rounded_rectangle([cx + 12, cy + 14, cx + 130, cy + row_h - 14], radius=14, fill=(255, 255, 255, 245))
-        draw.text((cx + 18, cy + 22), badge, fill=bg_col, font=get_font(18, bold=True))
-        # Main text
-        draw.text((cx + 140, cy + 24), text[:23], fill=(255, 255, 255, 255), font=get_font(21, bold=True))
-
-    # 7. "Interested Candidates" Callout Box
-    box_y = 905
-    box_h = 115
-    draw.rounded_rectangle(
-        [hero_x, box_y, hero_x + hero_w, box_y + box_h],
-        radius=25, fill=(255, 251, 235, 255), outline=(245, 158, 11, 255), width=3
-    )
-    # Blue CV Icon Box
-    draw.rounded_rectangle([hero_x + 20, box_y + 18, hero_x + 105, box_y + box_h - 18], radius=18, fill=(10, 36, 85, 255))
-    draw.text((hero_x + 36, box_y + 35), "CV", fill=(255, 195, 0, 255), font=get_font(30, bold=True))
-
-    draw.text((hero_x + 125, box_y + 22), "Direct Online Application • Zero Registration Fee", fill=(10, 36, 85, 255), font=get_font(25, bold=True))
-    draw.text((hero_x + 125, box_y + 60), "Click 'Apply Now' below to submit your application directly!", fill=(180, 83, 9, 255), font=get_font(21, bold=False))
-
-    # 8. Giant 3D Glowing "APPLY NOW" Button
-    btn_w = 820
-    btn_h = 95
-    btn_x = (width - btn_w) // 2
-    btn_y = 1045
-
-    # 3D shadow
-    draw.rounded_rectangle([btn_x + 6, btn_y + 10, btn_x + btn_w + 6, btn_y + btn_h + 10], radius=30, fill=(0, 100, 50, 120))
-    # Glowing Green Button
-    draw.rounded_rectangle([btn_x, btn_y, btn_x + btn_w, btn_y + btn_h], radius=30, fill=(0, 200, 100, 255), outline=(255, 255, 255, 255), width=3)
-    draw.text((btn_x + 85, btn_y + 20), "👉 APPLY NOW  —  GLOBALHIRE AI ↗", fill=(10, 36, 27, 255), font=get_font(38, bold=True))
-
-    # 9. Bottom Royal Navy Wave Footer
-    foot_y = 1170
-    draw.rectangle([0, foot_y, width, height], fill=(10, 36, 85, 255))
-    draw.line([(0, foot_y), (width, foot_y)], fill=(255, 195, 0, 255), width=6)
-
-    draw.text((hero_x, foot_y + 35), "📍 OFFICIAL WORLDWIDE RADAR:", fill=(255, 195, 0, 255), font=get_font(24, bold=True))
-    draw.text((hero_x, foot_y + 80), "GLOBALHIRE AI — https://globalhireai.vercel.app", fill=(255, 255, 255, 255), font=get_font(34, bold=True))
+    draw.text((pad_x + 65, foot_y + 22), "GlobalHire AI — Worldwide Remote Tech Radar", fill=(255, 255, 255), font=get_font(22, bold=True))
+    draw.text((pad_x + 65, foot_y + 52), "Explore 100+ verified work-from-anywhere jobs at https://globalhireai.vercel.app", fill=(140, 155, 150), font=get_font(16, bold=False))
 
     output = io.BytesIO()
     img.save(output, format="PNG", quality=95)

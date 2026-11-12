@@ -64,3 +64,4 @@ draw.text((100, 588), "globalhireai.vercel.app  •  Verified Global Careers Rad
 output_path = "/home/ubuntu/global-job-portal/og-image.png"
 img.save(output_path, "PNG")
 print("Saved to", output_path)
+
