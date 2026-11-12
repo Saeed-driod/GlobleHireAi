@@ -510,6 +510,7 @@ def dispatch_candidate_email_alerts():
 def main():
     parser = argparse.ArgumentParser(description="GlobalHire AI 24/7 Job Aggregator")
     parser.add_argument("--once", action="store_true", help="Run once and exit immediately")
+    parser.add_argument("--daemon", action="store_true", help="Run continuously in background daemon mode")
     parser.add_argument("--interval", type=int, default=10800, help="Interval in seconds between syncs (default: 3h / 10800s)")
     args = parser.parse_args()
 
