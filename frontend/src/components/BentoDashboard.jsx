@@ -16,6 +16,45 @@ import {
   deleteJob 
 } from '../api';
 
+function getCountryFlag(country = '', code = '') {
+  const c = (country || '').toLowerCase();
+  const cd = (code || '').toUpperCase();
+  if (cd === 'PK' || c.includes('pakistan')) return '🇵🇰';
+  if (cd === 'US' || c.includes('united states') || c.includes('usa')) return '🇺🇸';
+  if (cd === 'SE' || c.includes('sweden')) return '🇸🇪';
+  if (cd === 'IE' || c.includes('ireland')) return '🇮🇪';
+  if (cd === 'CA' || c.includes('canada')) return '🇨🇦';
+  if (cd === 'GB' || c.includes('united kingdom') || c.includes('uk') || c.includes('britain')) return '🇬🇧';
+  if (cd === 'DE' || c.includes('germany') || c.includes('deutschland')) return '🇩🇪';
+  if (cd === 'FR' || c.includes('france')) return '🇫🇷';
+  if (cd === 'IN' || c.includes('india')) return '🇮🇳';
+  if (cd === 'AE' || c.includes('emirates') || c.includes('uae') || c.includes('dubai')) return '🇦🇪';
+  if (cd === 'SA' || c.includes('saudi')) return '🇸🇦';
+  if (cd === 'AU' || c.includes('australia')) return '🇦🇺';
+  if (cd === 'BR' || c.includes('brazil')) return '🇧🇷';
+  if (cd === 'BD' || c.includes('bangladesh')) return '🇧🇩';
+  if (cd === 'NL' || c.includes('netherlands')) return '🇳🇱';
+  if (cd === 'IT' || c.includes('italy')) return '🇮🇹';
+  if (cd === 'ES' || c.includes('spain')) return '🇪🇸';
+  return '🌍';
+}
+
+function formatVisitorTime(dateStr) {
+  if (!dateStr) return 'Recently';
+  try {
+    const diffSecs = (Date.now() - new Date(dateStr + (dateStr.endsWith('Z') ? '' : 'Z')).getTime()) / 1000;
+    if (diffSecs < 60) return 'Just now';
+    const mins = Math.floor(diffSecs / 60);
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(diffSecs / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  } catch (e) {
+    return 'Recently';
+  }
+}
+
 export default function BentoDashboard({ onBackToPortal }) {
   const [activeTab, setActiveTab] = useState('traffic'); // 'traffic' | 'candidates' | 'jobs'
   
@@ -171,6 +210,12 @@ export default function BentoDashboard({ onBackToPortal }) {
   const topReferrers = traffic?.top_referrers || [];
   const topCountries = traffic?.top_countries || [];
   const devices = traffic?.devices || [];
+  const recentVisitors = traffic?.recent_visitors || [];
+  const [countrySearch, setCountrySearch] = useState('');
+
+  const filteredCountries = topCountries.filter(c => 
+    !countrySearch || (c.country || '').toLowerCase().includes(countrySearch.toLowerCase())
+  );
 
   return (
     <div className="min-h-screen bg-[#ECEEE9] text-[#17261F] pb-24">
@@ -432,38 +477,164 @@ export default function BentoDashboard({ onBackToPortal }) {
               </div>
             </div>
 
-            {/* Geographic Distribution (Top Countries) */}
+            {/* Complete Geographic Country Breakdown */}
+            <div className="bg-white p-6 rounded-3xl border border-black/[0.08] shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                <div>
+                  <h3 className="text-base font-extrabold text-[#17261F] flex items-center gap-2">
+                    <Globe className="w-5 h-5 text-[#00DF81]" />
+                    All Countries Traffic Intelligence (ممالک کی ٹریفک)
+                  </h3>
+                  <p className="text-xs text-[#6C7A72] mt-0.5">
+                    Track exactly which countries all candidate traffic is arriving from
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-[#8C9B92] absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Search country..."
+                      value={countrySearch}
+                      onChange={(e) => setCountrySearch(e.target.value)}
+                      className="pl-8 pr-3 py-1.5 rounded-xl bg-[#F4F6F2] border border-black/[0.06] text-xs font-semibold text-[#17261F] placeholder-[#8C9B92] focus:outline-none focus:border-[#00DF81] w-44"
+                    />
+                  </div>
+                  <span className="text-xs font-mono font-bold text-[#0A5734] px-2.5 py-1.5 rounded-xl bg-[#E3F9ED] border border-[#BCE8D3]">
+                    {topCountries.length} Countries
+                  </span>
+                </div>
+              </div>
+
+              {filteredCountries.length === 0 ? (
+                <div className="py-8 text-center text-[#6C7A72] text-xs">
+                  {countrySearch ? `No traffic found matching "${countrySearch}"` : 'Geographic data gathering in progress...'}
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Country Cards Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                    {filteredCountries.map((c, idx) => {
+                      const pct = totalViews > 0 ? Math.round((c.count / totalViews) * 100) : 0;
+                      const flag = getCountryFlag(c.country, c.country_code);
+                      return (
+                        <div 
+                          key={idx} 
+                          className="p-4 rounded-2xl bg-[#F4F6F2] border border-black/[0.05] hover:border-[#00DF81]/50 hover:shadow-md transition-all group"
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-2xl group-hover:scale-110 transition-transform">{flag}</span>
+                            <span className="font-mono text-base font-black text-[#0A241B]">
+                              {c.count.toLocaleString()}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-xs font-bold text-[#17261F] block truncate" title={c.country}>
+                              {c.country}
+                            </span>
+                            <span className="text-[11px] text-[#6C7A72] font-mono">
+                              {pct}% of visitors
+                            </span>
+                          </div>
+                          {/* Mini Progress */}
+                          <div className="w-full h-1.5 rounded-full bg-slate-200 mt-2.5 overflow-hidden">
+                            <div 
+                              className="h-full rounded-full bg-[#00DF81]"
+                              style={{ width: `${Math.max(4, pct)}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Real-Time Live Visitor Feed (Recent Visitors Stream) */}
             <div className="bg-white p-6 rounded-3xl border border-black/[0.08] shadow-sm">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="text-base font-extrabold text-[#17261F] flex items-center gap-2">
-                    <Globe className="w-4 h-4 text-[#00DF81]" />
-                    Geographic Breakdown (Top Countries)
+                    <Activity className="w-5 h-5 text-emerald-600 animate-pulse" />
+                    Real-Time Visitor Stream (کون کون وزٹ کر رہا ہے)
                   </h3>
-                  <p className="text-xs text-[#6C7A72] mt-0.5">Country locations of candidates visiting your site</p>
+                  <p className="text-xs text-[#6C7A72] mt-0.5">
+                    Live log of incoming candidate visits with origin country, referrer, and device
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+                  <span className="text-xs font-mono font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-200">
+                    Live Telemetry
+                  </span>
                 </div>
               </div>
 
-              {topCountries.length === 0 ? (
+              {recentVisitors.length === 0 ? (
                 <div className="py-8 text-center text-[#6C7A72] text-xs">
-                  Geographic data gathering in progress...
+                  Listening for incoming visitor traffic...
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
-                  {topCountries.map((c, idx) => (
-                    <div key={idx} className="p-4 rounded-2xl bg-[#F4F6F2] border border-black/[0.05] flex items-center justify-between">
-                      <div>
-                        <span className="text-xs font-bold text-[#17261F] block">{c.country}</span>
-                        <span className="text-[11px] text-[#6C7A72]">
-                          {totalViews > 0 ? Math.round((c.count / totalViews) * 100) : 0}% of traffic
-                        </span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-lg font-black text-[#0A241B] font-mono">{c.count}</span>
-                        <span className="text-[10px] text-[#6C7A72] block">visits</span>
-                      </div>
-                    </div>
-                  ))}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-black/[0.06] text-[11px] font-bold text-[#6C7A72] uppercase tracking-wider">
+                        <th className="py-3 px-3">Country & Location</th>
+                        <th className="py-3 px-3">Acquisition Source</th>
+                        <th className="py-3 px-3">Device</th>
+                        <th className="py-3 px-3">Page / URL</th>
+                        <th className="py-3 px-3 text-right">Time</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-black/[0.04] text-xs">
+                      {recentVisitors.slice(0, 25).map((v, idx) => {
+                        const flag = getCountryFlag(v.country, v.country_code);
+                        const isFB = (v.referrer || '').toLowerCase().includes('facebook');
+                        const isGoogle = (v.referrer || '').toLowerCase().includes('google');
+                        const isWA = (v.referrer || '').toLowerCase().includes('whatsapp');
+                        const isMob = (v.device || '').toLowerCase().includes('mobile');
+
+                        return (
+                          <tr key={idx} className="hover:bg-[#F4F6F2]/60 transition-colors">
+                            <td className="py-3 px-3 font-medium text-[#17261F]">
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">{flag}</span>
+                                <div>
+                                  <span className="font-bold text-[#17261F] block">{v.country || 'Worldwide'}</span>
+                                  {v.city && <span className="text-[10px] text-[#6C7A72] font-mono">{v.city}</span>}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3 px-3">
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                isFB ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                                isGoogle ? 'bg-red-100 text-red-800 border border-red-200' :
+                                isWA ? 'bg-green-100 text-green-800 border border-green-200' :
+                                'bg-slate-100 text-slate-700 border border-slate-200'
+                              }`}>
+                                <Share2 className="w-2.5 h-2.5" />
+                                {v.referrer || 'Direct'}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3">
+                              <span className="inline-flex items-center gap-1 text-[11px] text-[#3D4D43] font-medium">
+                                {isMob ? <Smartphone className="w-3.5 h-3.5 text-emerald-600" /> : <Laptop className="w-3.5 h-3.5 text-blue-600" />}
+                                {v.device || 'Desktop'}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3 font-mono text-[11px] text-[#6C7A72] max-w-[200px] truncate" title={v.page_url}>
+                              {v.page_url || '/'}
+                            </td>
+                            <td className="py-3 px-3 text-right font-mono text-[11px] text-[#6C7A72]">
+                              {formatVisitorTime(v.visited_at)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>

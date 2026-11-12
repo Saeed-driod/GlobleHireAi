@@ -113,16 +113,93 @@ export async function fetchCandidateStats() {
   return res.json();
 }
 
+const CODE_TO_NAME = {
+  'PK': 'Pakistan',
+  'US': 'United States',
+  'GB': 'United Kingdom',
+  'CA': 'Canada',
+  'DE': 'Germany',
+  'FR': 'France',
+  'SE': 'Sweden',
+  'IE': 'Ireland',
+  'IN': 'India',
+  'AE': 'United Arab Emirates',
+  'SA': 'Saudi Arabia',
+  'AU': 'Australia',
+  'BR': 'Brazil',
+  'NL': 'Netherlands',
+  'ES': 'Spain',
+  'IT': 'Italy',
+  'TR': 'Turkey',
+  'BD': 'Bangladesh'
+};
+
+const TIMEZONE_COUNTRY_MAP = {
+  'Asia/Karachi': { country: 'Pakistan', code: 'PK' },
+  'Asia/Kolkata': { country: 'India', code: 'IN' },
+  'Asia/Dhaka': { country: 'Bangladesh', code: 'BD' },
+  'Asia/Dubai': { country: 'United Arab Emirates', code: 'AE' },
+  'Asia/Riyadh': { country: 'Saudi Arabia', code: 'SA' },
+  'Europe/London': { country: 'United Kingdom', code: 'GB' },
+  'Europe/Berlin': { country: 'Germany', code: 'DE' },
+  'Europe/Paris': { country: 'France', code: 'FR' },
+  'Europe/Stockholm': { country: 'Sweden', code: 'SE' },
+  'Europe/Dublin': { country: 'Ireland', code: 'IE' },
+  'America/New_York': { country: 'United States', code: 'US' },
+  'America/Chicago': { country: 'United States', code: 'US' },
+  'America/Los_Angeles': { country: 'United States', code: 'US' },
+  'America/Toronto': { country: 'Canada', code: 'CA' },
+  'Australia/Sydney': { country: 'Australia', code: 'AU' }
+};
+
+export async function detectVisitorCountry() {
+  try {
+    const cached = sessionStorage.getItem('globalhire_geo');
+    if (cached) return JSON.parse(cached);
+
+    // Fast client-side GeoIP lookup
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), 1800);
+    const resp = await fetch('https://api.country.is/', { signal: ctrl.signal }).catch(() => null);
+    clearTimeout(timeout);
+
+    if (resp && resp.ok) {
+      const data = await resp.json();
+      const code = data.country;
+      const countryName = CODE_TO_NAME[code] || code;
+      const geo = { country: countryName, country_code: code };
+      sessionStorage.setItem('globalhire_geo', JSON.stringify(geo));
+      return geo;
+    }
+  } catch (e) {}
+
+  // Fallback to browser timezone
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (tz && TIMEZONE_COUNTRY_MAP[tz]) {
+      const geo = { country: TIMEZONE_COUNTRY_MAP[tz].country, country_code: TIMEZONE_COUNTRY_MAP[tz].code };
+      sessionStorage.setItem('globalhire_geo', JSON.stringify(geo));
+      return geo;
+    }
+  } catch (e) {}
+
+  return { country: null, country_code: null };
+}
+
 export async function trackPageVisit() {
   try {
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    const geo = await detectVisitorCountry();
+
     await fetch(`${API_BASE}/api/track/visit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         referrer: document.referrer || 'Direct',
         device: isMobile ? 'Mobile' : 'Desktop',
-        page_url: window.location.pathname + window.location.search
+        page_url: window.location.pathname + window.location.search,
+        country: geo.country,
+        country_code: geo.country_code
       })
     });
   } catch (e) {}

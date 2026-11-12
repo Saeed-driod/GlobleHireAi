@@ -810,11 +810,45 @@ def delete_candidate(cand_id: int) -> bool:
 # REAL-TIME TRAFFIC & ORIGIN ANALYTICS
 # -------------------------------------------------------------
 
-def log_visitor_traffic(ip: str = "Anonymous", country: str = "Worldwide", referrer: str = "Direct", device: str = "Desktop", page_url: str = "/"):
-    """Logs visitor traffic session with origin details."""
+def resolve_ip_geo(ip: str) -> tuple:
+    """Returns (country, country_code, city) using local cache or ip-api."""
+    if not ip or ip == "Anonymous" or ip.startswith("127.") or ip == "localhost":
+        return ("Worldwide", "WW", "Global")
+
     conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT country, country_code, city FROM ip_geo_cache WHERE ip = ?", (ip,))
+    row = cursor.fetchone()
+    if row:
+        conn.close()
+        return (row["country"] or "Worldwide", row["country_code"] or "", row["city"] or "")
+
+    # Perform lightweight lookup
+    try:
+        import urllib.request
+        url = f"http://ip-api.com/json/{ip}?fields=status,country,countryCode,city"
+        req = urllib.request.Request(url, headers={'User-Agent': 'GlobalHireAI/1.0'})
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+            if data.get('status') == 'success':
+                c = data.get('country') or 'Worldwide'
+                cc = data.get('countryCode') or ''
+                city = data.get('city') or ''
+                with conn:
+                    conn.execute("INSERT OR REPLACE INTO ip_geo_cache (ip, country, country_code, city) VALUES (?, ?, ?, ?)",
+                                 (ip, c, cc, city))
+                conn.close()
+                return (c, cc, city)
+    except Exception:
+        pass
+    
+    conn.close()
+    return ("Worldwide", "WW", "")
+
+def log_visitor_traffic(ip: str = "Anonymous", country: str = None, country_code: str = None, city: str = None, referrer: str = "Direct", device: str = "Desktop", page_url: str = "/"):
+    """Logs visitor traffic session with origin details, auto-resolving geo if needed."""
     # Normalize referrer
-    ref = referrer.lower().strip()
+    ref = (referrer or "Direct").lower().strip()
     clean_ref = "Direct"
     if "facebook" in ref or "fb.com" in ref:
         clean_ref = "Facebook"
@@ -831,19 +865,31 @@ def log_visitor_traffic(ip: str = "Anonymous", country: str = "Worldwide", refer
     elif ref and ref != "direct" and not ref.startswith("http://localhost") and not ref.startswith("http://150.136"):
         clean_ref = ref[:30]
 
+    # Resolve country if missing or Worldwide
+    final_country = country
+    final_cc = country_code
+    final_city = city
+
+    if not final_country or final_country in ["Worldwide", "Unknown", ""]:
+        resolved_c, resolved_cc, resolved_city = resolve_ip_geo(ip)
+        final_country = resolved_c
+        final_cc = resolved_cc
+        final_city = resolved_city
+
+    conn = get_db()
     try:
         with conn:
             conn.execute("""
-                INSERT INTO visitor_traffic_logs (ip, country, referrer, device, page_url)
-                VALUES (?, ?, ?, ?, ?)
-            """, (ip, country, clean_ref, device, page_url))
+                INSERT INTO visitor_traffic_logs (ip, country, country_code, city, referrer, device, page_url)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (ip, final_country or "Worldwide", final_cc or "", final_city or "", clean_ref, device, page_url))
     except Exception:
         pass
     finally:
         conn.close()
 
 def get_traffic_analytics() -> Dict[str, Any]:
-    """Returns comprehensive visitor stats, country origin, and referrer breakdown."""
+    """Returns comprehensive visitor stats, complete country origin, and live visitor feed."""
     conn = get_db()
     cursor = conn.cursor()
 
@@ -868,18 +914,20 @@ def get_traffic_analytics() -> Dict[str, Any]:
         FROM visitor_traffic_logs 
         GROUP BY referrer 
         ORDER BY count DESC 
-        LIMIT 6
+        LIMIT 10
     """)
     referrers = [dict(r) for r in cursor.fetchall()]
 
-    # Country Breakdown
+    # ALL Countries Breakdown (No restrictive LIMIT 6 so user can see every single country!)
     cursor.execute("""
-        SELECT country, COUNT(*) as count 
+        SELECT 
+            COALESCE(country, 'Worldwide') as country,
+            COALESCE(country_code, '') as country_code,
+            COUNT(*) as count 
         FROM visitor_traffic_logs 
         WHERE country IS NOT NULL AND country != ''
         GROUP BY country 
-        ORDER BY count DESC 
-        LIMIT 6
+        ORDER BY count DESC
     """)
     countries = [dict(r) for r in cursor.fetchall()]
 
@@ -901,6 +949,15 @@ def get_traffic_analytics() -> Dict[str, Any]:
     """)
     daily_history = [dict(r) for r in cursor.fetchall()]
 
+    # Real-Time Recent Visitors (Last 40 visitors stream)
+    cursor.execute("""
+        SELECT id, ip, country, country_code, city, referrer, device, page_url, visited_at
+        FROM visitor_traffic_logs
+        ORDER BY id DESC
+        LIMIT 40
+    """)
+    recent_visitors = [dict(r) for r in cursor.fetchall()]
+
     conn.close()
     return {
         "total_pageviews": total_views,
@@ -909,7 +966,8 @@ def get_traffic_analytics() -> Dict[str, Any]:
         "top_referrers": referrers,
         "top_countries": countries,
         "devices": devices,
-        "daily_history": daily_history
+        "daily_history": daily_history,
+        "recent_visitors": recent_visitors
     }
 
 

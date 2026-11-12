@@ -362,6 +362,8 @@ class VisitTrackRequest(BaseModel):
     device: Optional[str] = "Desktop"
     page_url: Optional[str] = "/"
     country: Optional[str] = None
+    country_code: Optional[str] = None
+    city: Optional[str] = None
 
 @app.post("/api/track/visit")
 def track_visitor_visit(req: Request, payload: Optional[VisitTrackRequest] = None):
@@ -369,11 +371,13 @@ def track_visitor_visit(req: Request, payload: Optional[VisitTrackRequest] = Non
         ip = req.headers.get("x-forwarded-for") or (req.client.host if req.client else "Anonymous")
         if ip and "," in ip:
             ip = ip.split(",")[0].strip()
-        country = (payload.country if payload else None) or req.headers.get("cf-ipcountry") or req.headers.get("x-country") or "Worldwide"
+        country = (payload.country if payload and payload.country else None) or req.headers.get("cf-ipcountry") or req.headers.get("x-country")
+        country_code = (payload.country_code if payload and payload.country_code else None) or req.headers.get("cf-ipcountry")
+        city = (payload.city if payload and payload.city else None)
         ref = (payload.referrer if payload and payload.referrer else req.headers.get("referer", "Direct"))
         dev = payload.device if payload and payload.device else "Desktop"
         page = payload.page_url if payload and payload.page_url else "/"
-        log_visitor_traffic(ip=ip, country=country, referrer=ref, device=dev, page_url=page)
+        log_visitor_traffic(ip=ip, country=country, country_code=country_code, city=city, referrer=ref, device=dev, page_url=page)
         return {"status": "ok"}
     except Exception as e:
         return {"status": "error", "detail": str(e)}
