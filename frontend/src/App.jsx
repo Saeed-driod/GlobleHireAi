@@ -99,14 +99,14 @@ export default function App() {
     setCandidateModalOpen(true);
   };
 
-  // Inject 5 Monetag Ad Scripts Safely (Once Per Session)
+  // Inject Optimized Monetag Ad Units Safely (Once Per Session)
   useEffect(() => {
     if (typeof window === 'undefined' || window.__globalHireMonetagLoaded) return;
     window.__globalHireMonetagLoaded = true;
 
     window.monetagConfig = {
       enabled: true,
-      zones: [12236005, 308627, 12236001, 12236002, 12236004],
+      zones: [12236005, 12236004, 12236002],
     };
 
     const appendScript = (src, attrs = {}) => {
@@ -128,31 +128,12 @@ export default function App() {
       }
     };
 
-    // 1. Primary: Monetag Vignette Banner (Zone 12236005 — load on mount)
-    try {
-      (function (s) {
-        s.dataset.zone = '12236005';
-        s.src = 'https://n6wxm.com/vignette.min.js';
-      })(
-        [document.documentElement, document.body]
-          .filter(Boolean)
-          .pop()
-          .appendChild(document.createElement('script'))
-      );
-    } catch (e) {
-      console.warn('[Monetag Vignette Error]:', e);
-    }
-
-    // 2. Primary: Monetag MultiTag & In-Page Push (Zone 308627 — load on mount)
-    appendScript('https://quge5.com/88/tag.min.js', { 'data-zone': '308627' });
-
-    // Stagger secondary ad tags by 2.5s to avoid initial page collision & protect Core Web Vitals
+    // 1. Vignette Banner (Zone 12236005 — load after 3 seconds delay)
     setTimeout(() => {
-      // 3. Secondary: Monetag Zone 12236001
       try {
         (function (s) {
-          s.dataset.zone = '12236001';
-          s.src = 'https://al5sm.com/tag.min.js';
+          s.dataset.zone = '12236005';
+          s.src = 'https://n6wxm.com/vignette.min.js';
         })(
           [document.documentElement, document.body]
             .filter(Boolean)
@@ -160,13 +141,12 @@ export default function App() {
             .appendChild(document.createElement('script'))
         );
       } catch (e) {
-        console.warn('[Monetag Zone 12236001 Error]:', e);
+        console.warn('[Monetag Vignette Error]:', e);
       }
+    }, 3000);
 
-      // 4. Secondary: Monetag Zone 12236002
-      appendScript('https://5gvci.com/act/files/tag.min.js?z=12236002');
-
-      // 5. Secondary: Monetag Zone 12236004
+    // 2. In-Page Push (Zone 12236004 — load after 5 seconds delay)
+    setTimeout(() => {
       try {
         (function (s) {
           s.dataset.zone = '12236004';
@@ -178,9 +158,14 @@ export default function App() {
             .appendChild(document.createElement('script'))
         );
       } catch (e) {
-        console.warn('[Monetag Zone 12236004 Error]:', e);
+        console.warn('[Monetag In-Page Push Error]:', e);
       }
-    }, 2500);
+    }, 5000);
+
+    // 3. Secondary Push/Tag (Zone 12236002 — load after 12 seconds delay)
+    setTimeout(() => {
+      appendScript('https://5gvci.com/act/files/tag.min.js?z=12236002');
+    }, 12000);
   }, []);
 
   // URL Hash & Slug Route check on mount
