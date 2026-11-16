@@ -8,7 +8,6 @@ import PostJobModal from './components/PostJobModal';
 import AdminLoginModal from './components/AdminLoginModal';
 import CandidateModal from './components/CandidateModal';
 import LegalModal from './components/LegalModal';
-import AdSlot from './components/AdSlot';
 import { fetchJobs, trackPageVisit } from './api';
 import { 
   Sparkles, Filter, Briefcase, Globe, CheckCircle2, 
@@ -99,6 +98,90 @@ export default function App() {
     setApplyingJob(job);
     setCandidateModalOpen(true);
   };
+
+  // Inject 5 Monetag Ad Scripts Safely (Once Per Session)
+  useEffect(() => {
+    if (typeof window === 'undefined' || window.__globalHireMonetagLoaded) return;
+    window.__globalHireMonetagLoaded = true;
+
+    window.monetagConfig = {
+      enabled: true,
+      zones: [12236005, 308627, 12236001, 12236002, 12236004],
+    };
+
+    const appendScript = (src, attrs = {}) => {
+      try {
+        const s = document.createElement('script');
+        s.src = src;
+        s.async = true;
+        s.setAttribute('data-cfasync', 'false');
+        Object.entries(attrs).forEach(([k, v]) => {
+          if (k.startsWith('data-')) {
+            s.dataset[k.replace('data-', '')] = v;
+          } else {
+            s.setAttribute(k, v);
+          }
+        });
+        document.body.appendChild(s);
+      } catch (e) {
+        console.warn('[Monetag Script Append Error]:', e);
+      }
+    };
+
+    // 1. Primary: Monetag Vignette Banner (Zone 12236005 — load on mount)
+    try {
+      (function (s) {
+        s.dataset.zone = '12236005';
+        s.src = 'https://n6wxm.com/vignette.min.js';
+      })(
+        [document.documentElement, document.body]
+          .filter(Boolean)
+          .pop()
+          .appendChild(document.createElement('script'))
+      );
+    } catch (e) {
+      console.warn('[Monetag Vignette Error]:', e);
+    }
+
+    // 2. Primary: Monetag MultiTag & In-Page Push (Zone 308627 — load on mount)
+    appendScript('https://quge5.com/88/tag.min.js', { 'data-zone': '308627' });
+
+    // Stagger secondary ad tags by 2.5s to avoid initial page collision & protect Core Web Vitals
+    setTimeout(() => {
+      // 3. Secondary: Monetag Zone 12236001
+      try {
+        (function (s) {
+          s.dataset.zone = '12236001';
+          s.src = 'https://al5sm.com/tag.min.js';
+        })(
+          [document.documentElement, document.body]
+            .filter(Boolean)
+            .pop()
+            .appendChild(document.createElement('script'))
+        );
+      } catch (e) {
+        console.warn('[Monetag Zone 12236001 Error]:', e);
+      }
+
+      // 4. Secondary: Monetag Zone 12236002
+      appendScript('https://5gvci.com/act/files/tag.min.js?z=12236002');
+
+      // 5. Secondary: Monetag Zone 12236004
+      try {
+        (function (s) {
+          s.dataset.zone = '12236004';
+          s.src = 'https://nap5k.com/tag.min.js';
+        })(
+          [document.documentElement, document.body]
+            .filter(Boolean)
+            .pop()
+            .appendChild(document.createElement('script'))
+        );
+      } catch (e) {
+        console.warn('[Monetag Zone 12236004 Error]:', e);
+      }
+    }, 2500);
+  }, []);
 
   // URL Hash & Slug Route check on mount
   useEffect(() => {
@@ -420,9 +503,6 @@ export default function App() {
         totalJobs={total}
       />
 
-      {/* Header Banner Ad Slot (Non-intrusive Native Banner) */}
-      <AdSlot type="leaderboard" />
-
       {/* Main Jobs Discovery Area */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 w-full flex-1">
         
@@ -696,26 +776,17 @@ export default function App() {
         ) : (
           /* Jobs Grid */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredJobs.map((job, index) => {
-              const showAd = (index + 1) % 5 === 0;
-              return (
-                <React.Fragment key={job.id}>
-                  {showAd && (
-                    <div className="md:col-span-2 lg:col-span-3 my-2">
-                      <AdSlot type="in-feed" />
-                    </div>
-                  )}
-                  <JobCard
-                    job={job}
-                    onSelect={(j) => setSelectedJobId(j.id)}
-                    onTagClick={handleTagClick}
-                    onApplyClick={handleApplyClick}
-                    isSaved={savedJobIds.includes(job.id)}
-                    onToggleSave={handleToggleSave}
-                  />
-                </React.Fragment>
-              );
-            })}
+            {filteredJobs.map((job) => (
+              <JobCard
+                key={job.id}
+                job={job}
+                onSelect={(j) => setSelectedJobId(j.id)}
+                onTagClick={handleTagClick}
+                onApplyClick={handleApplyClick}
+                isSaved={savedJobIds.includes(job.id)}
+                onToggleSave={handleToggleSave}
+              />
+            ))}
           </div>
         )}
 
