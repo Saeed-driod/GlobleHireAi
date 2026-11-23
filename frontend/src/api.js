@@ -3,6 +3,49 @@ const API_BASE = typeof window !== 'undefined' && window.location.hostname !== '
   ? ''
   : (import.meta.env.VITE_API_BASE_URL || 'http://150.136.214.192');
 
+// --- Admin Auth Key Management ---
+export function getAdminKey() {
+  if (typeof window === 'undefined') return '';
+  return sessionStorage.getItem('globalhire_admin_key') || localStorage.getItem('globalhire_admin_key') || '';
+}
+
+export function setAdminKey(key) {
+  if (typeof window === 'undefined') return;
+  const clean = (key || '').trim();
+  sessionStorage.setItem('globalhire_admin_key', clean);
+  sessionStorage.setItem('globalhire_admin_auth', 'true');
+}
+
+export function clearAdminKey() {
+  if (typeof window === 'undefined') return;
+  sessionStorage.removeItem('globalhire_admin_key');
+  sessionStorage.removeItem('globalhire_admin_auth');
+  localStorage.removeItem('globalhire_admin_key');
+}
+
+export function getAdminHeaders() {
+  const key = getAdminKey();
+  return key ? { 'X-Admin-Key': key } : {};
+}
+
+export async function verifyAdminCredentials(key) {
+  const testKey = (key || getAdminKey()).trim();
+  if (!testKey) throw new Error('Admin key is required');
+  const res = await fetch(`${API_BASE}/api/admin/verify`, {
+    headers: { 'X-Admin-Key': testKey }
+  });
+  if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
+      throw new Error('Invalid Admin Key. Access Denied.');
+    }
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Server returned HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+// --- Public Jobs API ---
+
 export async function fetchJobs({
   page = 1,
   limit = 15,
@@ -46,8 +89,12 @@ export async function logJobApply(jobId) {
   return res.json();
 }
 
+// --- Admin Endpoints (Require X-Admin-Key) ---
+
 export async function fetchDashboardStats() {
-  const res = await fetch(`${API_BASE}/api/dashboard/stats`);
+  const res = await fetch(`${API_BASE}/api/dashboard/stats`, {
+    headers: { ...getAdminHeaders() }
+  });
   if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to load dashboard stats`);
   return res.json();
 }
@@ -55,7 +102,7 @@ export async function fetchDashboardStats() {
 export async function triggerWorkerSync() {
   const res = await fetch(`${API_BASE}/api/worker/trigger`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' }
+    headers: { 'Content-Type': 'application/json', ...getAdminHeaders() }
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}: Trigger failed`);
   return res.json();
@@ -63,7 +110,8 @@ export async function triggerWorkerSync() {
 
 export async function toggleJobFeatured(jobId) {
   const res = await fetch(`${API_BASE}/api/jobs/${jobId}/feature`, {
-    method: 'PATCH'
+    method: 'PATCH',
+    headers: { ...getAdminHeaders() }
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to update job`);
   return res.json();
@@ -71,7 +119,8 @@ export async function toggleJobFeatured(jobId) {
 
 export async function deleteJob(jobId) {
   const res = await fetch(`${API_BASE}/api/jobs/${jobId}`, {
-    method: 'DELETE'
+    method: 'DELETE',
+    headers: { ...getAdminHeaders() }
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to delete job`);
   return res.json();
@@ -80,7 +129,7 @@ export async function deleteJob(jobId) {
 export async function createJob(jobData) {
   const res = await fetch(`${API_BASE}/api/jobs`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAdminHeaders() },
     body: JSON.stringify(jobData)
   });
   if (!res.ok) {
@@ -206,7 +255,9 @@ export async function trackPageVisit() {
 }
 
 export async function fetchTrafficAnalytics() {
-  const res = await fetch(`${API_BASE}/api/dashboard/traffic`);
+  const res = await fetch(`${API_BASE}/api/dashboard/traffic`, {
+    headers: { ...getAdminHeaders() }
+  });
   if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to fetch traffic analytics`);
   return res.json();
 }
@@ -214,17 +265,18 @@ export async function fetchTrafficAnalytics() {
 export async function fetchCandidates({ page = 1, limit = 50, q = '' } = {}) {
   const params = new URLSearchParams({ page, limit });
   if (q) params.set('q', q);
-  const res = await fetch(`${API_BASE}/api/candidates?${params.toString()}`);
+  const res = await fetch(`${API_BASE}/api/candidates?${params.toString()}`, {
+    headers: { ...getAdminHeaders() }
+  });
   if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to fetch candidates`);
   return res.json();
 }
 
 export async function deleteCandidate(candidateId) {
   const res = await fetch(`${API_BASE}/api/candidates/${candidateId}`, {
-    method: 'DELETE'
+    method: 'DELETE',
+    headers: { ...getAdminHeaders() }
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to delete candidate`);
   return res.json();
 }
-
-

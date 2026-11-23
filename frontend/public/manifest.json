@@ -1,0 +1,23 @@
+{
+  "name": "GlobalHire AI — Worldwide Remote Tech Jobs Radar",
+  "short_name": "GlobalHire AI",
+  "description": "Find verified remote jobs you can do from anywhere. Curated from trusted job boards with transparent salaries.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#090A0F",
+  "theme_color": "#090A0F",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/og-image.png",
+      "type": "image/png",
+      "sizes": "1200x630"
+    }
+  ]
+}

@@ -46,6 +46,7 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_jobs_posted_at ON jobs(posted_at DESC);
         CREATE INDEX IF NOT EXISTS idx_jobs_featured ON jobs(is_featured);
         CREATE INDEX IF NOT EXISTS idx_jobs_clicks ON jobs(clicks_count DESC);
+        CREATE INDEX IF NOT EXISTS idx_jobs_cat_type_posted ON jobs(category, job_type, posted_at DESC);
 
         CREATE TABLE IF NOT EXISTS applications_click_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

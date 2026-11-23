@@ -1,43 +1,56 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useTransition, Suspense, lazy } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import Navbar from './components/Navbar';
 import HeroSection from './components/HeroSection';
 import JobCard from './components/JobCard';
 import JobDetailModal from './components/JobDetailModal';
-import BentoDashboard from './components/BentoDashboard';
 import PostJobModal from './components/PostJobModal';
 import AdminLoginModal from './components/AdminLoginModal';
 import CandidateModal from './components/CandidateModal';
 import LegalModal from './components/LegalModal';
-import { fetchJobs, trackPageVisit } from './api';
-import { 
-  Sparkles, Filter, Briefcase, Globe, CheckCircle2, 
-  RefreshCw, Lock, DollarSign, Compass, Bookmark, 
-  ShieldCheck, Mail, FileText, Loader2, ArrowRight,
-  SlidersHorizontal, Building2, MapPin, Award, Check
-} from 'lucide-react';
+import FilterBar from './components/FilterBar';
+import EmptyState from './components/EmptyState';
+import LoadMoreSection from './components/LoadMoreSection';
+import SavedJobsBanner from './components/SavedJobsBanner';
+import Footer from './components/Footer';
+import { fetchJobs, trackPageVisit, getAdminKey, clearAdminKey } from './api';
+
+// Code Splitting: Lazy load heavy admin dashboard to keep initial bundle lean
+const BentoDashboard = lazy(() => import('./components/BentoDashboard'));
+
+function DashboardLoadingSkeleton() {
+  return (
+    <div className="min-h-screen bg-[#0A241B] text-white flex flex-col items-center justify-center p-6 space-y-4">
+      <div className="w-12 h-12 rounded-2xl border-4 border-[#00DF81]/20 border-t-[#00DF81] animate-spin"></div>
+      <p className="text-sm font-bold text-[#00DF81] tracking-wide">Loading Admin Intelligence Hub...</p>
+    </div>
+  );
+}
 
 export default function App() {
   const [view, setView] = useState('portal'); // 'portal' or 'admin'
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminModalOpen, setAdminModalOpen] = useState(false);
 
-  // Core Jobs Data
+  // Core Jobs Data & State
   const [jobs, setJobs] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [fetchError, setFetchError] = useState(null);
 
-  // Filters (Step 4)
+  // Filters State
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [category, setCategory] = useState('All');
   const [workplaceMode, setWorkplaceMode] = useState('Remote'); // 'Remote', 'Hybrid', 'On-site', 'All'
   const [sort, setSort] = useState('latest');
   const [activeQuickPill, setActiveQuickPill] = useState(null);
   const [countryFilter, setCountryFilter] = useState('All');
   const [salaryFilter, setSalaryFilter] = useState('All');
-  const [experienceLevel, setExperienceLevel] = useState('All'); // 'All', 'Entry', 'Mid', 'Senior', 'Lead'
+  const [experienceLevel, setExperienceLevel] = useState('All');
   const [openToPakistan, setOpenToPakistan] = useState(false);
   const [visaSponsored, setVisaSponsored] = useState(false);
   const [hideExpired, setHideExpired] = useState(false);
@@ -62,7 +75,7 @@ export default function App() {
     }
   });
 
-  // Modals
+  // Modals State
   const [selectedJobId, setSelectedJobId] = useState(null);
   const [postModalOpen, setPostModalOpen] = useState(false);
   const [candidateModalOpen, setCandidateModalOpen] = useState(false);
@@ -99,80 +112,11 @@ export default function App() {
     setCandidateModalOpen(true);
   };
 
-  // Inject Optimized Monetag Ad Units Safely (Once Per Session)
-  useEffect(() => {
-    if (typeof window === 'undefined' || window.__globalHireMonetagLoaded) return;
-    window.__globalHireMonetagLoaded = true;
-
-    window.monetagConfig = {
-      enabled: true,
-      zones: [12236005, 12236004, 12236002],
-    };
-
-    const appendScript = (src, attrs = {}) => {
-      try {
-        const s = document.createElement('script');
-        s.src = src;
-        s.async = true;
-        s.setAttribute('data-cfasync', 'false');
-        Object.entries(attrs).forEach(([k, v]) => {
-          if (k.startsWith('data-')) {
-            s.dataset[k.replace('data-', '')] = v;
-          } else {
-            s.setAttribute(k, v);
-          }
-        });
-        document.body.appendChild(s);
-      } catch (e) {
-        console.warn('[Monetag Script Append Error]:', e);
-      }
-    };
-
-    // 1. Vignette Banner (Zone 12236005 — load after 3 seconds delay)
-    setTimeout(() => {
-      try {
-        (function (s) {
-          s.dataset.zone = '12236005';
-          s.src = 'https://n6wxm.com/vignette.min.js';
-        })(
-          [document.documentElement, document.body]
-            .filter(Boolean)
-            .pop()
-            .appendChild(document.createElement('script'))
-        );
-      } catch (e) {
-        console.warn('[Monetag Vignette Error]:', e);
-      }
-    }, 3000);
-
-    // 2. In-Page Push (Zone 12236004 — load after 5 seconds delay)
-    setTimeout(() => {
-      try {
-        (function (s) {
-          s.dataset.zone = '12236004';
-          s.src = 'https://nap5k.com/tag.min.js';
-        })(
-          [document.documentElement, document.body]
-            .filter(Boolean)
-            .pop()
-            .appendChild(document.createElement('script'))
-        );
-      } catch (e) {
-        console.warn('[Monetag In-Page Push Error]:', e);
-      }
-    }, 5000);
-
-    // 3. Secondary Push/Tag (Zone 12236002 — load after 12 seconds delay)
-    setTimeout(() => {
-      appendScript('https://5gvci.com/act/files/tag.min.js?z=12236002');
-    }, 12000);
-  }, []);
-
   // URL Hash & Slug Route check on mount
   useEffect(() => {
     trackPageVisit();
 
-    const isAuth = sessionStorage.getItem('globalhire_admin_auth') === 'true';
+    const isAuth = Boolean(getAdminKey());
     setIsAdmin(isAuth);
 
     const checkHashAndRoute = () => {
@@ -180,31 +124,33 @@ export default function App() {
       const path = window.location.pathname;
 
       if (hash === '#admin' || hash === '#saeed-admin' || path === '/admin') {
-        if (sessionStorage.getItem('globalhire_admin_auth') === 'true') {
+        if (getAdminKey()) {
           setView('admin');
         } else {
+          setView('portal');
           setAdminModalOpen(true);
         }
       } else {
         setView('portal');
       }
 
-      // Check deep-linked job: /jobs/[slug]
+      // Deep-linked job (/jobs/[slug] or ?job=123)
       if (path.startsWith('/jobs/')) {
         const parts = path.split('/').filter(Boolean);
         const slug = parts[parts.length - 1] || '';
         const idMatch = slug.match(/-(\d+)$/);
-        if (idMatch) {
-          setSelectedJobId(Number(idMatch[1]));
-        }
+        if (idMatch) setSelectedJobId(Number(idMatch[1]));
       }
 
-      // Check query param (?job=123)
+      // Deep-linked legal routes (/about, /privacy, /terms, /contact)
+      const cleanPath = path.toLowerCase().replace(/\/$/, '');
+      if (['/about', '/privacy', '/terms', '/contact'].includes(cleanPath)) {
+        setLegalModalPage(cleanPath.replace('/', ''));
+      }
+
       const params = new URLSearchParams(window.location.search);
       const jobParam = params.get('job');
-      if (jobParam) {
-        setSelectedJobId(Number(jobParam));
-      }
+      if (jobParam) setSelectedJobId(Number(jobParam));
     };
 
     checkHashAndRoute();
@@ -212,26 +158,22 @@ export default function App() {
     return () => window.removeEventListener('hashchange', checkHashAndRoute);
   }, []);
 
-  // Sync real job count in document title / meta description
+  // Search input debounce (300ms)
   useEffect(() => {
-    if (total > 0) {
-      const desc = `Find remote jobs you can do from anywhere. Explore ${total} active worldwide remote jobs across tech, design, marketing, and support. Curated from trusted job boards with transparent salaries.`;
-      const metaDesc = document.querySelector('meta[name="description"]');
-      if (metaDesc) metaDesc.setAttribute('content', desc);
-      const ogDesc = document.querySelector('meta[property="og:description"]');
-      if (ogDesc) ogDesc.setAttribute('content', desc);
-      const twDesc = document.querySelector('meta[name="twitter:description"]');
-      if (twDesc) twDesc.setAttribute('content', desc);
-    }
-  }, [total]);
+    const handler = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
 
-  // Load jobs from API (supports initial fetch and incremental "Load More")
+  // Load jobs from API
   const loadJobs = async (targetPage = 1, append = false) => {
     if (append) {
       setLoadingMore(true);
     } else {
       setLoading(true);
     }
+    setFetchError(null);
 
     try {
       const includeOnsiteParam = workplaceMode === 'All' || workplaceMode === 'On-site';
@@ -240,7 +182,7 @@ export default function App() {
       const data = await fetchJobs({
         page: targetPage,
         limit: 15,
-        q: searchQuery,
+        q: debouncedQuery,
         category: category !== 'All' ? category : '',
         job_type: apiJobType,
         sort,
@@ -264,21 +206,19 @@ export default function App() {
       setTotalPages(data.total_pages || 1);
     } catch (err) {
       console.error('Failed to load jobs:', err);
+      setFetchError(err.message || 'Unable to connect to the jobs server.');
     } finally {
       setLoading(false);
       setLoadingMore(false);
     }
   };
 
-  // Debounced initial reload on filter criteria changes
+  // Trigger reload on filter criteria changes
   useEffect(() => {
-    const timer = setTimeout(() => {
-      loadJobs(1, false);
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [searchQuery, category, workplaceMode, sort]);
+    loadJobs(1, false);
+  }, [debouncedQuery, category, workplaceMode, sort]);
 
-  // Trigger "Load more"
+  // Load More Handler
   const handleLoadMore = () => {
     if (page < totalPages && !loadingMore) {
       loadJobs(page + 1, true);
@@ -392,15 +332,24 @@ export default function App() {
       setVisaSponsored(false);
     } else {
       setActiveQuickPill(pill.id);
-      if (pill.id === 'visa') {
-        setVisaSponsored(true);
-      } else {
-        setVisaSponsored(false);
-      }
+      setVisaSponsored(pill.id === 'visa');
       if (pill.filter?.category) setCategory(pill.filter.category);
       if (pill.filter?.job_type) setWorkplaceMode(pill.filter.job_type);
       if (pill.filter?.q !== undefined) setSearchQuery(pill.filter.q);
     }
+  };
+
+  const handleResetAllFilters = () => {
+    setCountryFilter('All');
+    setSalaryFilter('All');
+    setExperienceLevel('All');
+    setOpenToPakistan(false);
+    setVisaSponsored(false);
+    setHideExpired(false);
+    setWorkplaceMode('Remote');
+    setCategory('All');
+    setSearchQuery('');
+    setActiveQuickPill(null);
   };
 
   const handleTagClick = (tag) => {
@@ -415,16 +364,16 @@ export default function App() {
   };
 
   const handleAdminLogout = () => {
-    sessionStorage.removeItem('globalhire_admin_auth');
+    clearAdminKey();
     setIsAdmin(false);
     setView('portal');
     window.location.hash = '';
   };
 
-  // If viewing Admin Bento Dashboard
+  // If viewing Admin Bento Dashboard (Code Splitted with Suspense)
   if (view === 'admin') {
     return (
-      <>
+      <Suspense fallback={<DashboardLoadingSkeleton />}>
         <BentoDashboard
           onBackToPortal={handleAdminLogout}
           onSelectJob={(j) => setSelectedJobId(j.id)}
@@ -438,27 +387,9 @@ export default function App() {
             onApplyClick={handleApplyClick}
           />
         )}
-      </>
+      </Suspense>
     );
   }
-
-  const categoryChips = [
-    'All',
-    'Software Dev',
-    'AI / Data',
-    'Design',
-    'Marketing',
-    'Management',
-    'Customer Support',
-    'DevOps / Cloud'
-  ];
-
-  const workplaceOptions = [
-    { id: 'Remote', label: '🌍 Remote' },
-    { id: 'Hybrid', label: '🏢 Hybrid' },
-    { id: 'On-site', label: '📍 On-site' },
-    { id: 'All', label: '🌐 All Modes' },
-  ];
 
   return (
     <div className="min-h-screen bg-[#ECEEE9] dark:bg-[#06120E] text-[#17261F] dark:text-[#E2E8E4] flex flex-col font-sans transition-colors">
@@ -471,9 +402,7 @@ export default function App() {
         darkMode={darkMode}
         onToggleDarkMode={toggleDarkMode}
         savedCount={savedJobIds.length}
-        onViewSaved={() => {
-          setViewSavedOnly(prev => !prev);
-        }}
+        onViewSaved={() => setViewSavedOnly(prev => !prev)}
       />
 
       {/* Hero Section with Live Search */}
@@ -491,186 +420,33 @@ export default function App() {
       {/* Main Jobs Discovery Area */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 w-full flex-1">
         
-        {/* Step 4: Comprehensive Mobile-Friendly Filters Card */}
-        <div className="p-4 sm:p-5 rounded-3xl bg-white dark:bg-[#11231C] border border-black/[0.06] dark:border-white/[0.08] shadow-sm mb-8 space-y-4">
-          
-          {/* Top Row: Workplace Mode Segment + Category Chips */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-            
-            {/* Workplace Segmented Control (Remote / Hybrid / On-site / All) */}
-            <div className="inline-flex items-center p-1 rounded-2xl bg-[#F4F6F2] dark:bg-white/5 border border-black/[0.04] dark:border-white/5 shrink-0">
-              {workplaceOptions.map((opt) => {
-                const isSelected = workplaceMode === opt.id;
-                return (
-                  <button
-                    key={opt.id}
-                    onClick={() => setWorkplaceMode(opt.id)}
-                    aria-label={`Filter by ${opt.label} jobs`}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                      isSelected
-                        ? 'bg-white dark:bg-[#0A241B] text-[#0A5734] dark:text-[#00DF81] shadow-sm'
-                        : 'text-[#6C7A72] dark:text-slate-400 hover:text-[#17261F] dark:hover:text-white'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Category Chips with Horizontal Scrolling on Mobile */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full scrollbar-none">
-              {categoryChips.map((c) => {
-                const isActive = category === c;
-                return (
-                  <button
-                    key={c}
-                    onClick={() => setCategory(c)}
-                    className={`text-xs font-semibold px-3.5 py-1.5 rounded-2xl transition-all whitespace-nowrap ${
-                      isActive
-                        ? 'bg-[#0A241B] dark:bg-[#00DF81] text-[#00DF81] dark:text-[#0A241B] font-bold shadow-sm'
-                        : 'bg-[#F4F6F2] dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-[#57685E] dark:text-slate-300'
-                    }`}
-                  >
-                    {c}
-                  </button>
-                );
-              })}
-            </div>
-
-          </div>
-
-          {/* Bottom Filter Controls: Country, Salary, Experience, Pakistan, Visa, Expired */}
-          <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-black/[0.04] dark:border-white/5 text-xs">
-            
-            {/* Open to Pakistan Filter Toggle */}
-            <button
-              onClick={() => setOpenToPakistan(prev => !prev)}
-              aria-label="Filter jobs open to candidates in Pakistan"
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-2xl font-bold transition-all ${
-                openToPakistan
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'bg-[#F4F6F2] dark:bg-white/5 text-[#57685E] dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10'
-              }`}
-            >
-              <span>🇵🇰 Open to Pakistan</span>
-              {openToPakistan && <Check className="w-3.5 h-3.5" />}
-            </button>
-
-            {/* Visa Sponsorship Filter */}
-            <button
-              onClick={() => setVisaSponsored(prev => !prev)}
-              aria-label="Filter visa sponsored and relocation jobs"
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-2xl font-bold transition-all ${
-                visaSponsored
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'bg-[#F4F6F2] dark:bg-white/5 text-[#57685E] dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10'
-              }`}
-            >
-              <Compass className="w-3.5 h-3.5" />
-              <span>Visa Sponsorship</span>
-              {visaSponsored && <Check className="w-3.5 h-3.5" />}
-            </button>
-
-            {/* Country / Region Dropdown */}
-            <div className="relative">
-              <select
-                value={countryFilter}
-                onChange={(e) => setCountryFilter(e.target.value)}
-                aria-label="Filter by candidate country or region"
-                className="px-3 py-1.5 rounded-2xl bg-[#F4F6F2] dark:bg-white/5 text-[#57685E] dark:text-slate-300 font-semibold border-none focus:outline-none cursor-pointer"
-              >
-                <option value="All">All Regions</option>
-                <option value="Worldwide">🌍 Worldwide Only</option>
-                <option value="Pakistan">🇵🇰 Pakistan Friendly</option>
-                <option value="North America">🇺🇸 North America (US/CA)</option>
-                <option value="Europe">🇪🇺 Europe & UK</option>
-                <option value="Asia">🌏 Asia & Pacific</option>
-              </select>
-            </div>
-
-            {/* Salary Range Dropdown */}
-            <select
-              value={salaryFilter}
-              onChange={(e) => setSalaryFilter(e.target.value)}
-              aria-label="Filter by minimum salary range"
-              className="px-3 py-1.5 rounded-2xl bg-[#F4F6F2] dark:bg-white/5 text-[#57685E] dark:text-slate-300 font-semibold border-none focus:outline-none cursor-pointer"
-            >
-              <option value="All">All Salaries</option>
-              <option value="$50k+">$50,000+ / yr</option>
-              <option value="$100k+">$100,000+ / yr</option>
-              <option value="$150k+">$150,000+ / yr</option>
-              <option value="$200k+">$200,000+ / yr</option>
-            </select>
-
-            {/* Experience Level Dropdown */}
-            <select
-              value={experienceLevel}
-              onChange={(e) => setExperienceLevel(e.target.value)}
-              aria-label="Filter by candidate experience level"
-              className="px-3 py-1.5 rounded-2xl bg-[#F4F6F2] dark:bg-white/5 text-[#57685E] dark:text-slate-300 font-semibold border-none focus:outline-none cursor-pointer"
-            >
-              <option value="All">All Experience Levels</option>
-              <option value="Entry">Entry / Junior Level</option>
-              <option value="Mid">Mid-Level</option>
-              <option value="Senior">Senior Level</option>
-              <option value="Lead">Lead / Staff / Director</option>
-            </select>
-
-            {/* Hide Expired Toggle */}
-            <button
-              onClick={() => setHideExpired(prev => !prev)}
-              aria-label="Toggle hiding expired job listings"
-              className={`px-3 py-1.5 rounded-2xl font-semibold transition-all ${
-                hideExpired
-                  ? 'bg-[#0A241B] dark:bg-[#00DF81] text-[#00DF81] dark:text-[#0A241B] font-bold'
-                  : 'bg-[#F4F6F2] dark:bg-white/5 text-[#57685E] dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10'
-              }`}
-            >
-              Hide Expired (&gt;45d)
-            </button>
-
-            {/* Clear All Filters button if any active */}
-            {(countryFilter !== 'All' || salaryFilter !== 'All' || experienceLevel !== 'All' || openToPakistan || visaSponsored || hideExpired || workplaceMode !== 'Remote') && (
-              <button
-                onClick={() => {
-                  setCountryFilter('All');
-                  setSalaryFilter('All');
-                  setExperienceLevel('All');
-                  setOpenToPakistan(false);
-                  setVisaSponsored(false);
-                  setHideExpired(false);
-                  setWorkplaceMode('Remote');
-                  setCategory('All');
-                  setSearchQuery('');
-                }}
-                className="text-xs text-rose-600 dark:text-rose-400 font-bold hover:underline px-2 py-1 ml-auto"
-              >
-                Clear Filters
-              </button>
-            )}
-
-          </div>
-        </div>
+        {/* Modular Filter Bar */}
+        <FilterBar
+          category={category}
+          setCategory={setCategory}
+          workplaceMode={workplaceMode}
+          setWorkplaceMode={setWorkplaceMode}
+          countryFilter={countryFilter}
+          setCountryFilter={setCountryFilter}
+          salaryFilter={salaryFilter}
+          setSalaryFilter={setSalaryFilter}
+          experienceLevel={experienceLevel}
+          setExperienceLevel={setExperienceLevel}
+          openToPakistan={openToPakistan}
+          setOpenToPakistan={setOpenToPakistan}
+          visaSponsored={visaSponsored}
+          setVisaSponsored={setVisaSponsored}
+          hideExpired={hideExpired}
+          setHideExpired={setHideExpired}
+          onResetAll={handleResetAllFilters}
+        />
 
         {/* Saved Jobs View Banner */}
         {viewSavedOnly && (
-          <div className="mb-6 p-4 rounded-2xl bg-[#E3F9ED] dark:bg-[#00DF81]/15 border border-[#BCE8D3] dark:border-[#00DF81]/30 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Bookmark className="w-5 h-5 text-[#0A5734] dark:text-[#00DF81] fill-current" />
-              <span className="text-sm font-bold text-[#0A5734] dark:text-[#00DF81]">
-                Saved Bookmarks View ({savedJobIds.length})
-              </span>
-            </div>
-            <button
-              onClick={() => {
-                setViewSavedOnly(false);
-              }}
-              className="text-xs font-bold px-3.5 py-1.5 rounded-xl bg-white dark:bg-white/10 text-[#17261F] dark:text-white border border-black/[0.08] dark:border-white/10 hover:bg-slate-50 transition-all shadow-sm"
-            >
-              ← View All Remote Jobs
-            </button>
-          </div>
+          <SavedJobsBanner
+            savedCount={savedJobIds.length}
+            onCloseSavedView={() => setViewSavedOnly(false)}
+          />
         )}
 
         {/* Results Header */}
@@ -694,7 +470,8 @@ export default function App() {
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value)}
-              className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-white dark:bg-[#11231C] border border-black/[0.08] dark:border-white/10 text-[#17261F] dark:text-slate-200 focus:outline-none cursor-pointer"
+              aria-label="Sort listings"
+              className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-white dark:bg-[#11231C] border border-black/[0.08] dark:border-white/10 text-[#17261F] dark:text-slate-200 focus-visible:ring-2 focus-visible:ring-[#00DF81] focus-visible:outline-none cursor-pointer"
             >
               <option value="latest">Newest First</option>
               <option value="salary">Highest Salary</option>
@@ -721,154 +498,61 @@ export default function App() {
               </div>
             ))}
           </div>
-        ) : filteredJobs.length === 0 ? (
-          /* Empty State */
-          <div className="py-20 text-center rounded-3xl bg-white dark:bg-[#11231C] border border-black/[0.06] dark:border-white/[0.08] p-8 shadow-sm">
-            {viewSavedOnly ? (
-              <Bookmark className="w-12 h-12 text-[#00DF81] mx-auto mb-4" />
-            ) : (
-              <Briefcase className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-            )}
-            <h3 className="text-lg font-bold text-[#17261F] dark:text-white">
-              {viewSavedOnly ? 'No saved jobs yet' : 'No jobs found matching your criteria'}
-            </h3>
-            <p className="text-xs text-[#6C7A72] dark:text-slate-400 max-w-sm mx-auto mt-1 mb-6">
-              {viewSavedOnly 
-                ? 'Click the bookmark icon on any job card to save listings here for easy access.'
-                : 'Try broadening your keyword, clearing active filters, or toggling workplace mode.'}
-            </p>
-            <button
-              onClick={() => {
-                if (viewSavedOnly) {
-                  setViewSavedOnly(false);
-                } else {
-                  setSearchQuery('');
-                  setCategory('All');
-                  setWorkplaceMode('Remote');
-                  setCountryFilter('All');
-                  setSalaryFilter('All');
-                  setExperienceLevel('All');
-                  setOpenToPakistan(false);
-                  setVisaSponsored(false);
-                  setActiveQuickPill(null);
-                }
-              }}
-              className="px-5 py-2.5 rounded-2xl text-xs font-bold bg-[#0A241B] dark:bg-[#00DF81] text-[#00DF81] dark:text-[#0A241B] transition-all shadow-md hover:scale-105"
-            >
-              {viewSavedOnly ? '← Browse Remote Jobs' : 'Reset All Filters'}
-            </button>
-          </div>
+        ) : filteredJobs.length === 0 || fetchError ? (
+          /* Empty or Error State */
+          <EmptyState
+            viewSavedOnly={viewSavedOnly}
+            error={fetchError}
+            onRetry={() => loadJobs(1, false)}
+            onResetFilters={() => {
+              if (viewSavedOnly) setViewSavedOnly(false);
+              else handleResetAllFilters();
+            }}
+          />
         ) : (
-          /* Jobs Grid */
+          /* Framer Motion Animated Jobs Grid */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredJobs.map((job) => (
-              <JobCard
-                key={job.id}
-                job={job}
-                onSelect={(j) => setSelectedJobId(j.id)}
-                onTagClick={handleTagClick}
-                onApplyClick={handleApplyClick}
-                isSaved={savedJobIds.includes(job.id)}
-                onToggleSave={handleToggleSave}
-              />
-            ))}
+            <AnimatePresence mode="popLayout">
+              {filteredJobs.map((job, idx) => (
+                <motion.div
+                  key={job.id}
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.25, delay: Math.min(idx * 0.02, 0.2) }}
+                  layout
+                >
+                  <JobCard
+                    job={job}
+                    onSelect={(j) => setSelectedJobId(j.id)}
+                    onTagClick={handleTagClick}
+                    onApplyClick={handleApplyClick}
+                    isSaved={savedJobIds.includes(job.id)}
+                    onToggleSave={handleToggleSave}
+                  />
+                </motion.div>
+              ))}
+            </AnimatePresence>
           </div>
         )}
 
-        {/* Step 4: "Load More" Button (Replacing the 15-page pagination) */}
-        {!viewSavedOnly && (
-          <div className="mt-12 text-center">
-            {page < totalPages ? (
-              <div className="flex flex-col items-center gap-3">
-                <button
-                  onClick={handleLoadMore}
-                  disabled={loadingMore}
-                  aria-label="Load more remote jobs"
-                  className="px-8 py-3.5 rounded-2xl text-xs sm:text-sm font-black bg-[#0A241B] dark:bg-[#00DF81] text-[#00DF81] dark:text-[#0A241B] hover:bg-[#12382B] dark:hover:bg-[#2EF8A0] transition-all shadow-[0_4px_16px_rgba(10,36,27,0.15)] flex items-center gap-2 group active:scale-95 disabled:opacity-75 disabled:cursor-not-allowed"
-                >
-                  {loadingMore ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin text-[#00DF81] dark:text-[#0A241B]" />
-                      <span>Loading fresh listings...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Load More Remote Jobs</span>
-                      <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                    </>
-                  )}
-                </button>
-                <p className="text-[11px] text-[#6C7A72] dark:text-slate-400 font-mono">
-                  Showing {filteredJobs.length} of {total} total listings
-                </p>
-              </div>
-            ) : filteredJobs.length > 0 ? (
-              /* All jobs loaded state */
-              <div className="p-6 rounded-3xl bg-white dark:bg-[#11231C] border border-black/[0.06] dark:border-white/[0.08] max-w-lg mx-auto shadow-sm">
-                <div className="w-10 h-10 rounded-2xl bg-[#E3F9ED] dark:bg-[#00DF81]/20 text-[#0A5734] dark:text-[#00DF81] flex items-center justify-center mx-auto mb-3">
-                  <CheckCircle2 className="w-5 h-5" />
-                </div>
-                <h4 className="text-sm font-bold text-[#17261F] dark:text-white">
-                  You have viewed all {total} remote jobs!
-                </h4>
-                <p className="text-xs text-[#6C7A72] dark:text-slate-400 mt-1 mb-4">
-                  Do not see your exact role? Drop your CV profile and our automated radar will alert you as soon as new jobs open.
-                </p>
-                <button
-                  onClick={() => setCandidateModalOpen(true)}
-                  className="px-5 py-2.5 rounded-2xl text-xs font-extrabold bg-[#00DF81] text-[#0A241B] hover:bg-[#2EF8A0] transition-all shadow-sm"
-                >
-                  Drop Your CV for Alerts →
-                </button>
-              </div>
-            ) : null}
-          </div>
+        {/* Modular Load More Section */}
+        {!viewSavedOnly && !fetchError && (
+          <LoadMoreSection
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            currentCount={filteredJobs.length}
+            loadingMore={loadingMore}
+            onLoadMore={handleLoadMore}
+            onOpenCandidateModal={() => setCandidateModalOpen(true)}
+          />
         )}
 
       </main>
 
-      {/* Trust & Legal Footer */}
-      <footer className="mt-20 border-t border-black/[0.06] dark:border-white/[0.08] bg-[#E5E8E2] dark:bg-[#071510] py-12 text-center text-xs text-[#6C7A72] dark:text-slate-400">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4">
-          <div className="flex items-center justify-center gap-2">
-            <div className="w-6 h-6 rounded-xl bg-[#0A241B] dark:bg-[#00DF81] flex items-center justify-center text-[#00DF81] dark:text-[#0A241B] font-black text-xs">
-              G
-            </div>
-            <span className="font-bold text-[#17261F] dark:text-white text-sm">GlobalHire AI</span>
-          </div>
-
-          <p className="max-w-md mx-auto text-[#6C7A72] dark:text-slate-400 text-[11px] leading-relaxed">
-            Curated from trusted job boards. Remote listings aggregated from Remotive, Arbeitnow, Jobicy, and Himalayas.
-          </p>
-
-          {/* Legal and Trust Pages Links */}
-          <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 text-[#57685E] dark:text-slate-300 text-[11px] font-semibold">
-            <button onClick={() => setLegalModalPage('about')} className="hover:text-[#0A241B] dark:hover:text-[#00DF81] underline">
-              About Us
-            </button>
-            <span>•</span>
-            <button onClick={() => setLegalModalPage('contact')} className="hover:text-[#0A241B] dark:hover:text-[#00DF81] underline">
-              Contact & Support
-            </button>
-            <span>•</span>
-            <button onClick={() => setLegalModalPage('privacy')} className="hover:text-[#0A241B] dark:hover:text-[#00DF81] underline">
-              Privacy Policy
-            </button>
-            <span>•</span>
-            <button onClick={() => setLegalModalPage('terms')} className="hover:text-[#0A241B] dark:hover:text-[#00DF81] underline">
-              Terms of Service
-            </button>
-            <span>•</span>
-            <a href="/sitemap.xml" target="_blank" rel="noopener noreferrer" className="hover:text-[#0A241B] dark:hover:text-[#00DF81] underline">
-              Sitemap
-            </a>
-          </div>
-
-          <p className="text-[10px] text-[#8C9B92] pt-2">
-            © 2026 GlobalHire AI. All rights reserved.
-          </p>
-        </div>
-      </footer>
+      {/* Modular Trust & Legal Footer */}
+      <Footer onOpenLegalModal={(page) => setLegalModalPage(page)} />
 
       {/* Modals */}
       {selectedJobId && (

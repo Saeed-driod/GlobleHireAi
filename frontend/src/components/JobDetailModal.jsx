@@ -1,10 +1,21 @@
 import React, { useState, useEffect } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { 
   X, MapPin, Briefcase, DollarSign, Clock, ExternalLink, 
   Sparkles, Building2, CheckCircle2, Share2, ArrowUpRight 
 } from 'lucide-react';
 import PlaycardModal from './PlaycardModal';
+import JobDescriptionRenderer from './JobDescriptionRenderer';
 import { fetchJobById } from '../api';
+
+function slugify(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .slice(0, 80);
+}
 
 export default function JobDetailModal({ jobId, onClose, onTagClick, onSelectRelated, onApplyClick }) {
   const [job, setJob] = useState(null);
@@ -45,8 +56,70 @@ export default function JobDetailModal({ jobId, onClose, onTagClick, onSelectRel
     }
   };
 
+  const jobTitle = job?.title || '';
+  const companyName = job?.company_name || 'Company';
+  const pageTitle = job ? `${jobTitle} at ${companyName} | GlobalHire AI` : 'Remote Job Opening | GlobalHire AI';
+  const jobSlug = job ? `${slugify(jobTitle)}-${slugify(companyName)}-${job.id}` : '';
+  const canonicalUrl = job ? `https://globalhireai.vercel.app/jobs/${jobSlug}` : 'https://globalhireai.vercel.app/';
+  const metaDescription = job ? (job.excerpt || `Apply for ${jobTitle} at ${companyName}. Verified worldwide remote role curated on GlobalHire AI.`).slice(0, 160) : '';
+  const ogImage = job?.logo_url || 'https://globalhireai.vercel.app/og-image.png';
+
+  const jobPostingJsonLd = job ? {
+    "@context": "https://schema.org",
+    "@type": "JobPosting",
+    "title": job.title,
+    "description": job.description || job.excerpt || `${job.title} remote vacancy at ${job.company_name}`,
+    "identifier": {
+      "@type": "PropertyValue",
+      "name": job.company_name,
+      "value": String(job.id)
+    },
+    "datePosted": job.posted_at || new Date().toISOString(),
+    "validThrough": new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    "employmentType": job.job_type && job.job_type.toUpperCase().includes('PART') ? 'PART_TIME' : 
+                      job.job_type && job.job_type.toUpperCase().includes('CONTRACT') ? 'CONTRACTOR' : 'FULL_TIME',
+    "hiringOrganization": {
+      "@type": "Organization",
+      "name": job.company_name,
+      "logo": ogImage
+    },
+    "jobLocation": {
+      "@type": "Place",
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": job.location || "Worldwide"
+      }
+    },
+    "jobLocationType": "TELECOMMUTE",
+    "applicantLocationRequirements": {
+      "@type": "Country",
+      "name": job.location || "Worldwide"
+    },
+    "directApply": true
+  } : null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
+      {job && (
+        <Helmet>
+          <title>{pageTitle}</title>
+          <meta name="description" content={metaDescription} />
+          <link rel="canonical" href={canonicalUrl} />
+          <meta property="og:title" content={pageTitle} />
+          <meta property="og:description" content={metaDescription} />
+          <meta property="og:url" content={canonicalUrl} />
+          <meta property="og:image" content={ogImage} />
+          <meta name="twitter:card" content="summary_large_image" />
+          <meta name="twitter:title" content={pageTitle} />
+          <meta name="twitter:description" content={metaDescription} />
+          <meta name="twitter:image" content={ogImage} />
+          {jobPostingJsonLd && (
+            <script type="application/ld+json">
+              {JSON.stringify(jobPostingJsonLd)}
+            </script>
+          )}
+        </Helmet>
+      )}
       <div 
         className="relative w-full max-w-3xl bg-white dark:bg-[#11231C] text-[#17261F] dark:text-[#E2E8E4] rounded-3xl border border-black/[0.08] dark:border-white/[0.08] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
@@ -98,7 +171,7 @@ export default function JobDetailModal({ jobId, onClose, onTagClick, onSelectRel
               <div className="flex flex-col sm:flex-row items-start gap-4">
                 <div className="w-16 h-16 rounded-2xl bg-[#F0F2EE] dark:bg-white/5 border border-black/[0.05] dark:border-white/10 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
                   {job.company_logo ? (
-                    <img src={job.company_logo} alt={job.company_name} className="w-full h-full object-contain p-2" />
+                    <img src={job.company_logo} alt={job.company_name} loading="lazy" decoding="async" className="w-full h-full object-contain p-2" />
                   ) : (
                     <Building2 className="w-8 h-8 text-[#0A241B] dark:text-[#00DF81]" />
                   )}
@@ -190,8 +263,8 @@ export default function JobDetailModal({ jobId, onClose, onTagClick, onSelectRel
               {/* Description Content */}
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-wider text-[#6C7A72] dark:text-slate-400 mb-2.5">Scope & Responsibilities</h4>
-                <div className="text-xs sm:text-sm text-[#3D4D43] dark:text-slate-300 leading-relaxed whitespace-pre-line bg-[#FAFBF9] dark:bg-white/5 p-5 rounded-2xl border border-black/[0.05] dark:border-white/5 font-sans">
-                  {job.description}
+                <div className="bg-[#FAFBF9] dark:bg-white/5 p-5 rounded-2xl border border-black/[0.05] dark:border-white/5">
+                  <JobDescriptionRenderer description={job.description} maxChars={1200} />
                 </div>
               </div>
 

@@ -26,6 +26,7 @@ backend/__pycache__/
 # Build outputs
 # Note: dist can be ignored since Vercel builds from source with `npm run build`
 frontend/dist/
+remote_bundle.js
 
 # IDE & OS
 .vscode/
