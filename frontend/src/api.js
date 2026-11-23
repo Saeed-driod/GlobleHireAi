@@ -6,21 +6,31 @@ const API_BASE = typeof window !== 'undefined' && window.location.hostname !== '
 // --- Admin Auth Key Management ---
 export function getAdminKey() {
   if (typeof window === 'undefined') return '';
-  return sessionStorage.getItem('globalhire_admin_key') || localStorage.getItem('globalhire_admin_key') || '';
+  return (
+    localStorage.getItem('gh_admin_key') ||
+    localStorage.getItem('globalhire_admin_key') ||
+    sessionStorage.getItem('gh_admin_key') ||
+    sessionStorage.getItem('globalhire_admin_key') ||
+    ''
+  );
 }
 
 export function setAdminKey(key) {
   if (typeof window === 'undefined') return;
   const clean = (key || '').trim();
-  sessionStorage.setItem('globalhire_admin_key', clean);
+  localStorage.setItem('gh_admin_key', clean);
+  localStorage.setItem('globalhire_admin_key', clean);
+  sessionStorage.setItem('gh_admin_key', clean);
   sessionStorage.setItem('globalhire_admin_auth', 'true');
 }
 
 export function clearAdminKey() {
   if (typeof window === 'undefined') return;
+  localStorage.removeItem('gh_admin_key');
+  localStorage.removeItem('globalhire_admin_key');
+  sessionStorage.removeItem('gh_admin_key');
   sessionStorage.removeItem('globalhire_admin_key');
   sessionStorage.removeItem('globalhire_admin_auth');
-  localStorage.removeItem('globalhire_admin_key');
 }
 
 export function getAdminHeaders() {
@@ -36,7 +46,10 @@ export async function verifyAdminCredentials(key) {
   });
   if (!res.ok) {
     if (res.status === 401 || res.status === 403) {
-      throw new Error('Invalid Admin Key. Access Denied.');
+      throw new Error('403 Invalid Admin Key. Access Denied.');
+    }
+    if (res.status === 503) {
+      throw new Error('503 Service Unavailable: ADMIN_API_KEY is not configured on the server.');
     }
     const err = await res.json().catch(() => ({}));
     throw new Error(err.detail || `Server returned HTTP ${res.status}`);
@@ -141,6 +154,27 @@ export async function createJob(jobData) {
 
 export function getExportCsvUrl() {
   return `${API_BASE}/api/jobs/export/csv`;
+}
+
+export async function downloadJobsCsv() {
+  const res = await fetch(`${API_BASE}/api/jobs/export/csv`, {
+    headers: { ...getAdminHeaders() }
+  });
+  if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
+      throw new Error('403 Invalid Admin Key. Failed to export CSV.');
+    }
+    throw new Error(`HTTP ${res.status}: Failed to export CSV`);
+  }
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `globalhire_jobs_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
 }
 
 export async function subscribeCandidate(candidateData) {

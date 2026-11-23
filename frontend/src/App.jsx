@@ -124,12 +124,7 @@ export default function App() {
       const path = window.location.pathname;
 
       if (hash === '#admin' || hash === '#saeed-admin' || path === '/admin') {
-        if (getAdminKey()) {
-          setView('admin');
-        } else {
-          setView('portal');
-          setAdminModalOpen(true);
-        }
+        setView('admin');
       } else {
         setView('portal');
       }

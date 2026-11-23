@@ -3,7 +3,8 @@ import {
   Activity, Users, Globe, Eye, RefreshCw, Smartphone, Laptop, 
   Share2, Search, Trash2, Mail, Phone, GraduationCap, Briefcase, 
   Sparkles, CheckCircle2, AlertCircle, ArrowUpRight, ShieldCheck, 
-  LogOut, ExternalLink, Filter, Calendar, TrendingUp, Layers, ChevronRight
+  LogOut, ExternalLink, Filter, Calendar, TrendingUp, Layers, ChevronRight,
+  Lock, Key
 } from 'lucide-react';
 import { 
   fetchTrafficAnalytics, 
@@ -13,7 +14,12 @@ import {
   triggerWorkerSync, 
   fetchJobs, 
   toggleJobFeatured, 
-  deleteJob 
+  deleteJob,
+  getAdminKey,
+  setAdminKey,
+  clearAdminKey,
+  verifyAdminCredentials,
+  downloadJobsCsv
 } from '../api';
 
 function getCountryFlag(country = '', code = '') {
@@ -56,6 +62,11 @@ function formatVisitorTime(dateStr) {
 }
 
 export default function BentoDashboard({ onBackToPortal }) {
+  const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(getAdminKey()));
+  const [adminKeyInput, setAdminKeyInput] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+
   const [activeTab, setActiveTab] = useState('traffic'); // 'traffic' | 'candidates' | 'jobs'
   
   // Traffic Analytics State
@@ -78,15 +89,29 @@ export default function BentoDashboard({ onBackToPortal }) {
   const [syncMsg, setSyncMsg] = useState('');
   const [stats, setStats] = useState(null);
 
+  const handleAuthError = (err) => {
+    const msg = String(err?.message || '');
+    if (msg.includes('401') || msg.includes('403') || msg.includes('Unauthorized') || msg.includes('Denied')) {
+      clearAdminKey();
+      setIsAuthenticated(false);
+      setAuthError('403: Invalid or expired Admin Key. Access Denied.');
+    } else if (msg.includes('503')) {
+      clearAdminKey();
+      setIsAuthenticated(false);
+      setAuthError('503: Admin service unavailable (key not configured on server).');
+    }
+  };
+
   // Auto-refresh interval
   useEffect(() => {
+    if (!isAuthenticated) return;
     loadAllData();
     const interval = setInterval(() => {
       loadTraffic();
       loadCandidates();
     }, 20000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isAuthenticated]);
 
   const loadAllData = () => {
     loadTraffic();
@@ -96,18 +121,27 @@ export default function BentoDashboard({ onBackToPortal }) {
   };
 
   const loadTraffic = async () => {
+    if (!getAdminKey()) {
+      setIsAuthenticated(false);
+      return;
+    }
     setTrafficLoading(true);
     try {
       const res = await fetchTrafficAnalytics();
       setTraffic(res);
     } catch (err) {
       console.error('Failed to load traffic:', err);
+      handleAuthError(err);
     } finally {
       setTrafficLoading(false);
     }
   };
 
   const loadCandidates = async () => {
+    if (!getAdminKey()) {
+      setIsAuthenticated(false);
+      return;
+    }
     setCandidatesLoading(true);
     try {
       const res = await fetchCandidates({ page: 1, limit: 100, q: candidateSearch });
@@ -115,17 +149,19 @@ export default function BentoDashboard({ onBackToPortal }) {
       setCandidateTotal(res.total || 0);
     } catch (err) {
       console.error('Failed to load candidates:', err);
+      handleAuthError(err);
     } finally {
       setCandidatesLoading(false);
     }
   };
 
   useEffect(() => {
+    if (!isAuthenticated) return;
     const timer = setTimeout(() => {
       loadCandidates();
     }, 300);
     return () => clearTimeout(timer);
-  }, [candidateSearch]);
+  }, [candidateSearch, isAuthenticated]);
 
   const loadJobs = async () => {
     setJobsLoading(true);
@@ -141,17 +177,24 @@ export default function BentoDashboard({ onBackToPortal }) {
   };
 
   useEffect(() => {
+    if (!isAuthenticated) return;
     const timer = setTimeout(() => {
       loadJobs();
     }, 300);
     return () => clearTimeout(timer);
-  }, [jobSearch]);
+  }, [jobSearch, isAuthenticated]);
 
   const loadSystemStats = async () => {
+    if (!getAdminKey()) {
+      setIsAuthenticated(false);
+      return;
+    }
     try {
       const res = await fetchDashboardStats();
       setStats(res);
-    } catch (err) {}
+    } catch (err) {
+      handleAuthError(err);
+    }
   };
 
   const handleSyncWorker = async () => {
@@ -217,6 +260,107 @@ export default function BentoDashboard({ onBackToPortal }) {
     !countrySearch || (c.country || '').toLowerCase().includes(countrySearch.toLowerCase())
   );
 
+  if (!isAuthenticated) {
+    const handleKeySubmit = async (e) => {
+      e.preventDefault();
+      const cleanKey = adminKeyInput.trim();
+      if (!cleanKey) {
+        setAuthError('Please enter Admin Key.');
+        return;
+      }
+      setAuthLoading(true);
+      setAuthError('');
+      try {
+        await verifyAdminCredentials(cleanKey);
+        setAdminKey(cleanKey);
+        setIsAuthenticated(true);
+      } catch (err) {
+        const msg = String(err?.message || '');
+        if (msg.includes('403') || msg.includes('401') || msg.includes('Denied') || msg.includes('Invalid')) {
+          setAuthError('403: Invalid Admin Key. Access Denied.');
+        } else if (msg.includes('503')) {
+          setAuthError('503: Admin Service Unavailable (key not configured on server).');
+        } else {
+          setAuthError(msg || '403: Invalid Admin Key.');
+        }
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+
+    return (
+      <div className="min-h-screen bg-[#071510] text-[#E2E8E4] flex items-center justify-center p-4">
+        <div className="w-full max-w-sm bg-[#11231C] border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
+          <div className="text-center space-y-2">
+            <div className="w-12 h-12 rounded-2xl bg-[#00DF81]/20 text-[#00DF81] flex items-center justify-center mx-auto shadow-inner">
+              <Lock className="w-6 h-6" />
+            </div>
+            <h1 className="text-xl font-black text-white tracking-tight">Admin Command Center</h1>
+            <p className="text-xs text-slate-400">
+              Enter authorized <span className="font-mono text-[#00DF81]">X-Admin-Key</span> to access stats and candidate records
+            </p>
+          </div>
+
+          <form onSubmit={handleKeySubmit} className="space-y-4">
+            <div>
+              <label className="text-xs font-bold text-slate-300 block mb-1.5">
+                Admin Key
+              </label>
+              <div className="relative">
+                <Key className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  autoFocus
+                  type="password"
+                  placeholder="Enter Admin Key..."
+                  value={adminKeyInput}
+                  onChange={(e) => {
+                    setAdminKeyInput(e.target.value);
+                    setAuthError('');
+                  }}
+                  disabled={authLoading}
+                  className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white/5 border border-white/10 text-xs font-semibold text-white placeholder-slate-500 focus:outline-none focus:border-[#00DF81]"
+                />
+              </div>
+            </div>
+
+            {authError && (
+              <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-1.5 font-medium animate-fadeIn">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>{authError}</span>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={authLoading}
+              className="w-full py-3 rounded-2xl bg-[#00DF81] hover:bg-[#2EF8A0] text-[#0A241B] font-extrabold text-xs flex items-center justify-center gap-2 transition-all shadow-md active:scale-95 disabled:opacity-60"
+            >
+              {authLoading ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Verifying Key...</span>
+                </>
+              ) : (
+                <>
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Unlock Admin Dashboard</span>
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={onBackToPortal}
+              className="w-full py-2 rounded-xl text-slate-400 hover:text-white text-xs font-semibold transition-colors"
+            >
+              Back to Job Portal
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#ECEEE9] text-[#17261F] pb-24">
       {/* Top Header */}
@@ -250,7 +394,26 @@ export default function BentoDashboard({ onBackToPortal }) {
             </button>
 
             <button
-              onClick={onBackToPortal}
+              onClick={async () => {
+                try {
+                  await downloadJobsCsv();
+                } catch (e) {
+                  alert(e.message || 'Failed to export CSV');
+                }
+              }}
+              title="Export Jobs to CSV"
+              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all text-xs flex items-center gap-1.5"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Export CSV</span>
+            </button>
+
+            <button
+              onClick={() => {
+                clearAdminKey();
+                setIsAuthenticated(false);
+                if (onBackToPortal) onBackToPortal();
+              }}
               className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#00DF81] hover:bg-[#2EF8A0] text-[#0A241B] text-xs font-bold transition-all shadow-md active:scale-95"
             >
               <LogOut className="w-3.5 h-3.5" />
