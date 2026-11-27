@@ -3,8 +3,9 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
-    { "source": "/sitemap.xml", "destination": "/api/sitemap" },
+    { "source": "/sitemap.xml", "destination": "http://150.136.214.192/api/sitemap" },
     { "source": "/api/(.*)", "destination": "http://150.136.214.192/api/$1" },
+    { "source": "/jobs/(.*)", "destination": "/spa.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

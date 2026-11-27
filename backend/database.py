@@ -296,7 +296,8 @@ def get_jobs(
     country: Optional[str] = None,
     featured: Optional[bool] = None,
     sort: str = "latest",
-    include_onsite: bool = False
+    include_onsite: bool = False,
+    include_full_description: bool = False
 ) -> Dict[str, Any]:
     conn = get_db()
     cursor = conn.cursor()
@@ -364,11 +365,12 @@ def get_jobs(
 
     # Pagination
     offset = max(0, (page - 1) * limit)
+    desc_col = "description, " if include_full_description else ""
     query_sql = f"""
         SELECT id, title, company_name, company_logo, location, country,
                job_type, category, salary_range, apply_url, source_api,
                tags, is_featured, views_count, clicks_count, posted_at, created_at,
-               SUBSTR(description, 1, 350) as excerpt
+               {desc_col}SUBSTR(description, 1, 350) as excerpt
         FROM jobs
         {where_clause}
         {order_by}
@@ -397,6 +399,31 @@ def get_jobs(
         "limit": limit,
         "total_pages": total_pages
     }
+
+def get_sitemap_jobs(limit: int = 1500) -> List[Dict[str, Any]]:
+    """Lightweight query returning active remote jobs for dynamic XML sitemap generation."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id, title, company_name, posted_at
+        FROM jobs
+        WHERE (
+            (LOWER(job_type) = 'remote' OR LOWER(location) LIKE '%remote%' OR LOWER(location) LIKE '%worldwide%' OR LOWER(location) LIKE '%anywhere%')
+            AND LOWER(job_type) NOT IN ('on-site', 'onsite')
+            AND LOWER(location) NOT LIKE '%berlin%'
+            AND LOWER(location) NOT LIKE '%munich%'
+            AND LOWER(location) NOT LIKE '%münchen%'
+            AND LOWER(location) NOT LIKE '%dresden%'
+        )
+        AND title NOT LIKE '%(m/w/d)%'
+        AND title NOT LIKE '%(w/m/d)%'
+        AND title NOT LIKE '%(m/w/x)%'
+        ORDER BY posted_at DESC, id DESC
+        LIMIT ?
+    """, (limit,))
+    rows = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+    return rows
 
 def get_job_by_id(job_id: int) -> Optional[Dict[str, Any]]:
     conn = get_db()

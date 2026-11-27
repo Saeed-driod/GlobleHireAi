@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useTransition, Suspense, lazy } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { motion, AnimatePresence } from 'framer-motion';
 import Navbar from './components/Navbar';
 import HeroSection from './components/HeroSection';
@@ -16,6 +17,16 @@ import Footer from './components/Footer';
 import { fetchJobs, trackPageVisit, getAdminKey, clearAdminKey } from './api';
 
 // Code Splitting: Lazy load heavy admin dashboard to keep initial bundle lean
+const CATEGORY_SEO_ROUTES = {
+  '/remote-software-dev-jobs': { cat: 'Software Dev', title: 'Remote Software Developer Jobs Worldwide | GlobalHire AI', desc: 'Explore verified worldwide remote software engineering and development jobs with direct application links.' },
+  '/remote-ai-data-jobs': { cat: 'AI / Data', title: 'Remote AI, ML & Data Science Jobs | GlobalHire AI', desc: 'Find remote artificial intelligence, machine learning, and data engineering roles open globally.' },
+  '/remote-devops-cloud-jobs': { cat: 'DevOps / Cloud', title: 'Remote DevOps, SRE & Cloud Engineer Jobs | GlobalHire AI', desc: 'Discover remote Kubernetes, AWS, Terraform, and Cloud infrastructure jobs hiring globally.' },
+  '/remote-design-jobs': { cat: 'Design', title: 'Remote UI/UX & Product Design Jobs | GlobalHire AI', desc: 'Curated remote UI/UX designer, product design, and creative tech openings worldwide.' },
+  '/remote-marketing-jobs': { cat: 'Marketing', title: 'Remote Digital Marketing & Growth Jobs | GlobalHire AI', desc: 'Apply to remote SEO, content marketing, growth, and social media roles worldwide.' },
+  '/remote-customer-support-jobs': { cat: 'Customer Support', title: 'Remote Customer Support & Success Jobs | GlobalHire AI', desc: 'Work-from-anywhere customer support, technical support, and client success openings.' },
+  '/remote-management-jobs': { cat: 'Management', title: 'Remote Product & Project Management Jobs | GlobalHire AI', desc: 'Worldwide remote product manager, project lead, and operations management careers.' },
+};
+
 const BentoDashboard = lazy(() => import('./components/BentoDashboard'));
 
 function DashboardLoadingSkeleton() {
@@ -138,9 +149,14 @@ export default function App() {
       }
 
       // Deep-linked legal routes (/about, /privacy, /terms, /contact)
-      const cleanPath = path.toLowerCase().replace(/\/$/, '');
+      const cleanPath = path.toLowerCase().replace(/\/$/, '') || '/';
       if (['/about', '/privacy', '/terms', '/contact'].includes(cleanPath)) {
         setLegalModalPage(cleanPath.replace('/', ''));
+      }
+
+      // Deep-linked SEO Category Landing Pages
+      if (CATEGORY_SEO_ROUTES[cleanPath]) {
+        setCategory(CATEGORY_SEO_ROUTES[cleanPath].cat);
       }
 
       const params = new URLSearchParams(window.location.search);
@@ -547,7 +563,29 @@ export default function App() {
       </main>
 
       {/* Modular Trust & Legal Footer */}
-      <Footer onOpenLegalModal={(page) => setLegalModalPage(page)} />
+      <Footer
+        onOpenLegalModal={(page) => setLegalModalPage(page)}
+        onSelectCategory={(cat) => setCategory(cat)}
+      />
+
+      {!selectedJobId && (() => {
+        const cleanPath = typeof window !== 'undefined' ? (window.location.pathname.toLowerCase().replace(/\/$/, '') || '/') : '/';
+        const activeRouteSeo = CATEGORY_SEO_ROUTES[cleanPath];
+        if (activeRouteSeo) {
+          const url = `https://globalhireai.vercel.app${cleanPath}`;
+          return (
+            <Helmet>
+              <title>{activeRouteSeo.title}</title>
+              <meta name="description" content={activeRouteSeo.desc} />
+              <link rel="canonical" href={url} />
+              <meta property="og:title" content={activeRouteSeo.title} />
+              <meta property="og:description" content={activeRouteSeo.desc} />
+              <meta property="og:url" content={url} />
+            </Helmet>
+          );
+        }
+        return null;
+      })()}
 
       {/* Modals */}
       {selectedJobId && (

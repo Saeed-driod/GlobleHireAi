@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 import threading
 import html
 import logging
@@ -8,6 +9,7 @@ from typing import Optional, List, Annotated
 from fastapi import FastAPI, HTTPException, Request, Query, BackgroundTasks, Security, Depends, status
 from fastapi.responses import Response, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field, EmailStr, field_validator, StringConstraints
 
@@ -62,6 +64,7 @@ from database import (
     init_db,
     upsert_job,
     get_jobs,
+    get_sitemap_jobs,
     get_job_by_id,
     log_apply_click,
     get_dashboard_stats,
@@ -139,6 +142,8 @@ app = FastAPI(
     redoc_url=None,
     openapi_url=None
 )
+
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # --- CORS Hardening (Strict Origin Whitelist & Vercel Previews Regex) ---
 ALLOWED_ORIGINS = [
@@ -275,7 +280,8 @@ def list_jobs(
     country: Optional[str] = Query(None),
     featured: Optional[bool] = Query(None),
     sort: str = Query("latest", pattern="^(latest|popular|featured)$"),
-    include_onsite: bool = Query(False)
+    include_onsite: bool = Query(False),
+    include_full_description: bool = Query(False)
 ):
     try:
         data = get_jobs(
@@ -287,7 +293,8 @@ def list_jobs(
             country=country,
             featured=featured,
             sort=sort,
-            include_onsite=include_onsite
+            include_onsite=include_onsite,
+            include_full_description=include_full_description
         )
         return data
     except Exception as e:
@@ -397,32 +404,52 @@ def get_rss_feed():
         logger.error(f"Error generating RSS feed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to generate RSS feed.")
 
+def _seo_slugify(text: str) -> str:
+    cleaned = re.sub(r"[^\w\s-]", "", str(text or "").lower(), flags=re.ASCII).strip()
+    return re.sub(r"\s+", "-", cleaned)[:80]
+
 @app.get("/api/sitemap")
 def get_sitemap():
     try:
-        data = get_jobs(page=1, limit=200, sort="latest")
-        urls = []
-        for j in data.get("jobs", []):
-            job_url = f"https://globalhireai.vercel.app/?job={j['id']}"
-            pub = (j.get('posted_at') or '')[:10]
-            urls.append(f"""
-  <url>
-    <loc>{job_url}</loc>
-    <lastmod>{pub}</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.8</priority>
-  </url>""")
-        
+        site_url = "https://globalhireai.vercel.app"
+        static_entries = [
+            (f"{site_url}/", "hourly", "1.0"),
+            (f"{site_url}/remote-software-dev-jobs", "daily", "0.9"),
+            (f"{site_url}/remote-ai-data-jobs", "daily", "0.9"),
+            (f"{site_url}/remote-devops-cloud-jobs", "daily", "0.9"),
+            (f"{site_url}/remote-design-jobs", "daily", "0.9"),
+            (f"{site_url}/remote-marketing-jobs", "daily", "0.9"),
+            (f"{site_url}/remote-customer-support-jobs", "daily", "0.9"),
+            (f"{site_url}/remote-management-jobs", "daily", "0.9"),
+            (f"{site_url}/about", "monthly", "0.7"),
+            (f"{site_url}/contact", "monthly", "0.7"),
+            (f"{site_url}/privacy", "monthly", "0.5"),
+            (f"{site_url}/terms", "monthly", "0.5"),
+        ]
+        urls = [
+            f"  <url>\n    <loc>{loc}</loc>\n    <changefreq>{cf}</changefreq>\n    <priority>{prio}</priority>\n  </url>"
+            for loc, cf, prio in static_entries
+        ]
+
+        jobs = get_sitemap_jobs(limit=1500)
+        for j in jobs:
+            slug = f"{_seo_slugify(j.get('title'))}-{_seo_slugify(j.get('company_name'))}-{j['id']}"
+            job_url = html.escape(f"{site_url}/jobs/{slug}", quote=True)
+            pub = str(j.get("posted_at") or "")[:10]
+            lastmod_tag = f"\n    <lastmod>{pub}</lastmod>" if re.match(r"^\d{4}-\d{2}-\d{2}$", pub) else ""
+            urls.append(
+                f"  <url>\n    <loc>{job_url}</loc>{lastmod_tag}\n    <changefreq>daily</changefreq>\n    <priority>0.8</priority>\n  </url>"
+            )
+
         xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>https://globalhireai.vercel.app/</loc>
-    <changefreq>hourly</changefreq>
-    <priority>1.0</priority>
-  </url>
-  {''.join(urls)}
+{chr(10).join(urls)}
 </urlset>"""
-        return Response(content=xml, media_type="application/xml")
+        return Response(
+            content=xml,
+            media_type="application/xml; charset=utf-8",
+            headers={"Cache-Control": "public, max-age=1800, s-maxage=3600"}
+        )
     except Exception as e:
         logger.error(f"Error generating sitemap: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to generate sitemap.")

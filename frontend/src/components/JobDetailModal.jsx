@@ -17,6 +17,42 @@ function slugify(text) {
     .slice(0, 80);
 }
 
+const VALID_COUNTRY_MAP = {
+  'us': 'United States',
+  'usa': 'United States',
+  'united states': 'United States',
+  'uk': 'United Kingdom',
+  'united kingdom': 'United Kingdom',
+  'canada': 'Canada',
+  'germany': 'Germany',
+  'ireland': 'Ireland',
+  'australia': 'Australia',
+  'india': 'India',
+  'pakistan': 'Pakistan',
+  'france': 'France',
+  'netherlands': 'Netherlands',
+  'spain': 'Spain',
+  'sweden': 'Sweden',
+  'italy': 'Italy',
+  'brazil': 'Brazil',
+  'poland': 'Poland',
+  'portugal': 'Portugal',
+  'singapore': 'Singapore',
+  'uae': 'United Arab Emirates',
+  'united arab emirates': 'United Arab Emirates'
+};
+
+function resolveValidCountry(locStr) {
+  const clean = String(locStr || '').trim().toLowerCase();
+  if (!clean) return null;
+  if (VALID_COUNTRY_MAP[clean]) return VALID_COUNTRY_MAP[clean];
+  return null;
+}
+
+function stripHtmlForSeo(str) {
+  return String(str || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 export default function JobDetailModal({ jobId, onClose, onTagClick, onSelectRelated, onApplyClick }) {
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -61,21 +97,38 @@ export default function JobDetailModal({ jobId, onClose, onTagClick, onSelectRel
   const pageTitle = job ? `${jobTitle} at ${companyName} | GlobalHire AI` : 'Remote Job Opening | GlobalHire AI';
   const jobSlug = job ? `${slugify(jobTitle)}-${slugify(companyName)}-${job.id}` : '';
   const canonicalUrl = job ? `https://globalhireai.vercel.app/jobs/${jobSlug}` : 'https://globalhireai.vercel.app/';
-  const metaDescription = job ? (job.excerpt || `Apply for ${jobTitle} at ${companyName}. Verified worldwide remote role curated on GlobalHire AI.`).slice(0, 160) : '';
-  const ogImage = job?.logo_url || 'https://globalhireai.vercel.app/og-image.png';
+  const rawSeoText = stripHtmlForSeo(job?.description || job?.excerpt || '');
+  const metaDescription = job ? (rawSeoText || `Apply for ${jobTitle} at ${companyName}. Verified worldwide remote role curated on GlobalHire AI.`).slice(0, 158) : '';
+  const ogImage = job?.company_logo || 'https://globalhireai.vercel.app/og-image.png';
+  const validCountry = job ? (resolveValidCountry(job.country) || resolveValidCountry(job.location)) : null;
+
+  let baseSalarySchema = undefined;
+  if (job?.salary_range && job.salary_range !== 'Competitive') {
+    const nums = job.salary_range.match(/\d[\d,.]*/g);
+    if (nums && nums.length > 0) {
+      const val = parseFloat(nums[0].replace(/,/g, '')) * (job.salary_range.toLowerCase().includes('k') ? 1000 : 1);
+      if (!Number.isNaN(val) && val > 0) {
+        baseSalarySchema = {
+          "@type": "MonetaryAmount",
+          "currency": "USD",
+          "value": { "@type": "QuantitativeValue", "value": val, "unitText": "YEAR" }
+        };
+      }
+    }
+  }
 
   const jobPostingJsonLd = job ? {
-    "@context": "https://schema.org",
+    "@context": "https://schema.org/",
     "@type": "JobPosting",
     "title": job.title,
-    "description": job.description || job.excerpt || `${job.title} remote vacancy at ${job.company_name}`,
+    "description": rawSeoText || `${job.title} remote vacancy at ${job.company_name}`,
     "identifier": {
       "@type": "PropertyValue",
       "name": job.company_name,
       "value": String(job.id)
     },
     "datePosted": job.posted_at || new Date().toISOString(),
-    "validThrough": new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    "validThrough": new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString(),
     "employmentType": job.job_type && job.job_type.toUpperCase().includes('PART') ? 'PART_TIME' : 
                       job.job_type && job.job_type.toUpperCase().includes('CONTRACT') ? 'CONTRACTOR' : 'FULL_TIME',
     "hiringOrganization": {
@@ -83,19 +136,10 @@ export default function JobDetailModal({ jobId, onClose, onTagClick, onSelectRel
       "name": job.company_name,
       "logo": ogImage
     },
-    "jobLocation": {
-      "@type": "Place",
-      "address": {
-        "@type": "PostalAddress",
-        "addressCountry": job.location || "Worldwide"
-      }
-    },
     "jobLocationType": "TELECOMMUTE",
-    "applicantLocationRequirements": {
-      "@type": "Country",
-      "name": job.location || "Worldwide"
-    },
-    "directApply": true
+    ...(validCountry ? { "applicantLocationRequirements": { "@type": "Country", "name": validCountry } } : {}),
+    ...(baseSalarySchema ? { "baseSalary": baseSalarySchema } : {}),
+    "directApply": false
   } : null;
 
   return (

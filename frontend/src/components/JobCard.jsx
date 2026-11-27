@@ -81,6 +81,15 @@ function isJobExpired(isoString) {
   }
 }
 
+function slugify(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .slice(0, 80);
+}
+
 export default function JobCard({ 
   job, 
   onSelect,
@@ -90,6 +99,7 @@ export default function JobCard({
   isSaved = false, 
   onToggleSave 
 }) {
+  const jobSlugUrl = `/jobs/${slugify(job.title)}-${slugify(job.company_name)}-${job.id}`;
   const handleApply = (e) => {
     e.stopPropagation();
     if (onApplyClick) {
@@ -184,7 +194,21 @@ export default function JobCard({
               title={job.title}
               className="text-base font-extrabold text-[#17261F] dark:text-white group-hover:text-[#0A5734] dark:group-hover:text-[#00DF81] transition-colors line-clamp-2 leading-snug cursor-pointer"
             >
-              {job.title}
+              <a
+                href={jobSlugUrl}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (window.location.pathname !== jobSlugUrl) {
+                    window.history.pushState({}, '', jobSlugUrl);
+                  }
+                  if (onSelectJob) onSelectJob(job.id);
+                  else if (onSelect) onSelect(job);
+                }}
+                className="hover:underline focus-visible:outline-none"
+              >
+                {job.title}
+              </a>
             </h3>
             
             <p className="text-xs font-semibold text-[#6C7A72] dark:text-slate-400 flex flex-wrap items-center gap-1.5 mt-0.5">
